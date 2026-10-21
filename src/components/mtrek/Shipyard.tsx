@@ -3,7 +3,7 @@ import { CLASSES, SHEETS } from "@/game/classes";
 import { loadCallsign, loadScores, saveCallsign, type ScoreRow } from "@/game/scores";
 
 type Props = {
-  onStart: (name: string, classId: string) => void;
+  onStart: (name: string, classId: string, room: string | null) => void;
 };
 
 export function Shipyard({ onStart }: Props) {
@@ -11,6 +11,7 @@ export function Shipyard({ onStart }: Props) {
   const [name, setName] = useState("USS Intrepid");
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [real, setReal] = useState(true);
+  const [room, setRoom] = useState("");
   const selected = CLASSES.find((c) => c.id === classId) ?? CLASSES[0];
 
   useEffect(() => {
@@ -18,12 +19,33 @@ export function Shipyard({ onStart }: Props) {
     setName(saved.name);
     if (CLASSES.some((c) => c.id === saved.classId)) setClassId(saved.classId);
     setScores(loadScores());
+    const fromUrl = new URLSearchParams(window.location.search).get("room") ?? "";
+    const clean = fromUrl.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    if (clean) setRoom(clean);
   }, []);
 
   const launch = () => {
     const trimmed = name.trim().slice(0, 18) || "USS Intrepid";
+    const code = room.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
     saveCallsign(trimmed, selected.id);
-    onStart(trimmed, selected.id);
+    const url = new URL(window.location.href);
+    if (code) url.searchParams.set("room", code);
+    else url.searchParams.delete("room");
+    window.history.replaceState(null, "", url);
+    onStart(trimmed, selected.id, code || null);
+  };
+
+  const copyLink = async () => {
+    const code = room.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    if (!code) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("room", code);
+    window.history.replaceState(null, "", url);
+    try {
+      await navigator.clipboard.writeText(url.toString());
+    } catch {
+      /* the address bar already holds the room */
+    }
   };
 
   const sheet = SHEETS[selected.id];
@@ -191,6 +213,7 @@ export function Shipyard({ onStart }: Props) {
                 />
                 <Cell k="DRONES" v={selected.drones ? `${selected.drones} × ${selected.droneDmg ?? 0}` : "—"} />
                 <Cell k="MINES" v={selected.mines ? `${selected.mines} × ${selected.mineDmg ?? 0}` : "—"} />
+                <Cell k="CRYSTALS" v={selected.crystals ? String(selected.crystals) : "—"} />
               </dl>
             </section>
           )}
@@ -244,7 +267,40 @@ export function Shipyard({ onStart }: Props) {
         </div>
       </div>
 
-      <footer className="flex shrink-0 items-end gap-3 border-t border-line px-4 py-3 md:px-8">
+      <footer className="flex shrink-0 flex-col gap-2 border-t border-line px-4 py-3 md:px-8">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="font-mono text-xs text-muted">ROOM CODE</span>
+            <input
+              value={room}
+              onChange={(e) => setRoom(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+              maxLength={6}
+              placeholder="Solo if empty"
+              aria-label="Room code"
+              className="mt-1 w-full border border-line bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-amber"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+              let code = "";
+              for (let i = 0; i < 4; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+              setRoom(code);
+            }}
+            className="h-11 border border-line px-3 font-mono text-xs"
+          >
+            New room
+          </button>
+          <button type="button" onClick={() => void copyLink()} className="h-11 border border-line px-3 font-mono text-xs">
+            Copy link
+          </button>
+        </div>
+        <p className="font-mono text-xs text-muted">
+          Same code, same site, shared quadrant. Up to eight ships. The handshake stays on this
+          server. The fight goes browser to browser, so a published copy hosts itself.
+        </p>
+        <div className="flex items-end gap-3">
         <label className="min-w-0 flex-1">
           <span className="font-mono text-xs text-muted">SHIP NAME</span>
           <input
@@ -265,6 +321,7 @@ export function Shipyard({ onStart }: Props) {
         >
           Start
         </button>
+        </div>
       </footer>
     </div>
   );

@@ -3,6 +3,7 @@ import { unlockAudio } from "@/game/audio";
 import { cameraFor, drawTactical, pickShipAt } from "@/game/draw";
 import { saveScore } from "@/game/scores";
 import { TrekSim, type Snapshot } from "@/game/sim";
+import { NetLink } from "@/components/mtrek/NetLink";
 
 declare global {
   interface Window {
@@ -18,6 +19,7 @@ declare global {
 type Props = {
   name: string;
   classId: string;
+  room: string | null;
   onLeave: () => void;
 };
 
@@ -31,9 +33,10 @@ function clock(s: number) {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
-export function Bridge({ name, classId, onLeave }: Props) {
+export function Bridge({ name, classId, room, onLeave }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const simRef = useRef<TrekSim | null>(null);
+  const netSend = useRef<((data: unknown) => void) | null>(null);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [paused, setPaused] = useState(false);
   const [help, setHelp] = useState(false);
@@ -42,7 +45,7 @@ export function Bridge({ name, classId, onLeave }: Props) {
   pausedRef.current = paused || help;
 
   useEffect(() => {
-    const sim = new TrekSim(name, classId);
+    const sim = new TrekSim(name, classId, { bots: !room });
     simRef.current = sim;
     sim.onBank = (ship) => {
       saveScore({
@@ -201,6 +204,7 @@ export function Bridge({ name, classId, onLeave }: Props) {
     const sim = simRef.current;
     if (!sim) return;
     sim.hail(hail);
+    if (hail.trim()) netSend.current?.({ k: "hail", text: `${name}: ${hail.trim().slice(0, 80)}` });
     setHail("");
     setSnap(sim.snapshot());
   };
@@ -209,7 +213,9 @@ export function Bridge({ name, classId, onLeave }: Props) {
     <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-bg text-fg">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-3 py-2 md:px-4">
         <div className="min-w-0">
-          <p className="font-mono text-xs tracking-widest text-amber">MTREK · QUADRANT ALPHA</p>
+          <p className="font-mono text-xs tracking-widest text-amber">
+            MTREK · {room ? `ROOM ${room}` : "SOLO QUADRANT"}
+          </p>
           <p className="truncate font-sans text-sm font-semibold">
             {snap ? `${snap.letter} ${snap.name}` : name}{" "}
             <span className="font-mono text-xs font-normal text-muted">{snap?.code}</span>
@@ -236,6 +242,7 @@ export function Bridge({ name, classId, onLeave }: Props) {
           </button>
         </div>
       </header>
+      {room ? <NetLink room={room} name={name} simRef={simRef} sendRef={netSend} /> : null}
 
       {snap && (
         <div className="flex shrink-0 gap-3 overflow-x-auto border-b border-line px-3 py-2 font-mono text-xs md:hidden">
@@ -244,6 +251,7 @@ export function Bridge({ name, classId, onLeave }: Props) {
             HULL {Math.round((snap.hull / snap.hullMax) * 100)}%
           </span>
           <span>SH {Math.round(snap.shield)}%</span>
+          {snap.crystalsMax > 0 && <span>XL {snap.crystals}</span>}
           <span className="text-amber">+{snap.unbanked}</span>
         </div>
       )}
@@ -371,7 +379,7 @@ export function Bridge({ name, classId, onLeave }: Props) {
               <li>Click a ship to lock. Locked torpedoes curve in. Unlocked ones fly straight.</li>
               <li>Phasers need a lock or a target in the forward arc. ESI hits everyone in range. Agonizers are flat and spend a torpedo. G launches a drone. M drops a mine.</li>
               <li>Dock inside 100 units under warp 1.4. Gold paid there is (damage + veteran bonus) / 10. Klingon obliterators return one every two seconds.</li>
-              <li>R raises shields. Shift+R drops them. C repairs the hull. Planets trickle dilithium.</li>
+              <li>R raises shields. Shift+R drops them. C repairs the hull. Dilithium soaks damage that gets through the shields and refills when you dock. Planets trickle energy.</li>
               <li>Wormholes open and shut about once a minute. Cloaked ships cannot enter, and the same ship must wait a minute to transit again.</li>
             </ul>
             <div className="mt-5 flex gap-2">
@@ -408,6 +416,7 @@ function Status({ snap }: { snap: Snapshot }) {
       <Stat k={snap.torpName.toUpperCase()} v={`${snap.torps} / ${snap.torpMax}`} />
       {snap.dronesMax > 0 && <Stat k="DRONES" v={`${snap.drones} / ${snap.dronesMax}`} />}
       {snap.minesMax > 0 && <Stat k="MINES" v={`${snap.mines} / ${snap.minesMax}`} />}
+      {snap.crystalsMax > 0 && <Stat k="CRYSTALS" v={`${snap.crystals} / ${snap.crystalsMax}`} />}
       <Stat k="WORMHOLE" v={snap.holeOpen ? "OPEN" : "DARK"} />
       <Stat k="CLOAK" v={snap.canCloak ? (snap.cloakOn ? "ON" : "OFF") : "NONE"} />
       <Stat k="REPAIR" v={snap.repair ? "ON" : "OFF"} />

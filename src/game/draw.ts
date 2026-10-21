@@ -29,21 +29,83 @@ function toScreen(cam: Camera, x: number, y: number) {
   };
 }
 
-function shipPoly(ctx: CanvasRenderingContext2D, yaw: number, x: number, y: number, scale = 1) {
-  const pts = [
-    [0, -16],
-    [-9, 11],
-    [0, 6],
-    [9, 11],
-  ];
+function paintShip(
+  ctx: CanvasRenderingContext2D,
+  kind: string,
+  yaw: number,
+  x: number,
+  y: number,
+  scale: number,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-yaw);
+  ctx.scale(scale, scale);
   ctx.beginPath();
-  pts.forEach(([lx, ly], i) => {
-    const wx = (lx * Math.cos(yaw) + ly * Math.sin(yaw)) * scale;
-    const wy = (-lx * Math.sin(yaw) + ly * Math.cos(yaw)) * scale;
-    if (i === 0) ctx.moveTo(x + wx, y + wy);
-    else ctx.lineTo(x + wx, y + wy);
-  });
-  ctx.closePath();
+  const fed = () => {
+    ctx.ellipse(0, -2, 7, 9, 0, 0, Math.PI * 2);
+    ctx.rect(-3, 2, 6, 10);
+    ctx.rect(-12, 4, 5, 12);
+    ctx.rect(7, 4, 5, 12);
+  };
+  const bird = () => {
+    ctx.moveTo(0, -16);
+    ctx.lineTo(-16, 8);
+    ctx.lineTo(-6, 4);
+    ctx.lineTo(0, 12);
+    ctx.lineTo(6, 4);
+    ctx.lineTo(16, 8);
+    ctx.closePath();
+  };
+  const klingon = () => {
+    ctx.moveTo(0, -16);
+    ctx.lineTo(-4, -4);
+    ctx.lineTo(-14, 6);
+    ctx.lineTo(-4, 2);
+    ctx.lineTo(-3, 12);
+    ctx.lineTo(3, 12);
+    ctx.lineTo(4, 2);
+    ctx.lineTo(14, 6);
+    ctx.lineTo(4, -4);
+    ctx.closePath();
+  };
+  const galor = () => {
+    ctx.moveTo(0, -12);
+    ctx.lineTo(-14, 2);
+    ctx.lineTo(-8, 10);
+    ctx.lineTo(0, 4);
+    ctx.lineTo(8, 10);
+    ctx.lineTo(14, 2);
+    ctx.closePath();
+  };
+  const dart = () => {
+    ctx.moveTo(0, -15);
+    ctx.lineTo(-6, 12);
+    ctx.lineTo(0, 7);
+    ctx.lineTo(6, 12);
+    ctx.closePath();
+  };
+  const barge = () => {
+    ctx.rect(-8, -12, 16, 24);
+    ctx.rect(-14, -4, 5, 14);
+    ctx.rect(9, -4, 5, 14);
+  };
+  const gorn = () => {
+    ctx.moveTo(0, -14);
+    ctx.lineTo(-16, 4);
+    ctx.lineTo(-10, 14);
+    ctx.lineTo(10, 14);
+    ctx.lineTo(16, 4);
+    ctx.closePath();
+  };
+  if (kind === "DY600") barge();
+  else if (kind === "RBOP" || kind === "WARBIRD") bird();
+  else if (kind === "KEV12" || kind === "KPB13") klingon();
+  else if (kind === "CDA180" || kind === "CDA120") galor();
+  else if (kind === "BR5" || kind === "BR1000") dart();
+  else if (kind === "CV97") gorn();
+  else fed();
+  ctx.restore();
 }
 
 export function drawTactical(
@@ -104,7 +166,7 @@ export function drawTactical(
   }
   ctx.setLineDash([]);
 
-  for (const hole of HOLES) {
+  HOLES.forEach((hole, i) => {
     const p = toScreen(cam, hole.x, hole.y);
     const open = sim.holeOpen;
     ctx.strokeStyle = open ? AMBER : MUTED;
@@ -119,8 +181,8 @@ export function drawTactical(
     ctx.globalAlpha = 1;
     ctx.fillStyle = open ? MUTED : LINE;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(open ? "WORMHOLE" : "WORMHOLE DARK", p.x + 22, p.y + 4);
-  }
+    ctx.fillText(open ? (i === 0 ? "ALPHA MOUTH" : "BETA MOUTH") : "WORMHOLE DARK", p.x + 22, p.y + 4);
+  });
 
   for (const planet of PLANETS) {
     const p = toScreen(cam, planet.x, planet.y);
@@ -226,9 +288,9 @@ export function drawTactical(
     }
     ctx.lineWidth = ship.hitFlash > 0 ? 2.5 : 1.5;
     ctx.strokeStyle = ship.hitFlash > 0 ? FG : color;
-    ctx.fillStyle = mine ? "#2a2114" : "#2a1410";
+    ctx.fillStyle = mine ? "#241c12" : "#1a140f";
     if (ship.docked) ctx.setLineDash([3, 3]);
-    shipPoly(ctx, ship.yaw, p.x, p.y, mine ? 1.05 : 1);
+    paintShip(ctx, ship.cls.id, ship.yaw, p.x, p.y, mine ? 1.55 : 1.35);
     ctx.fill();
     ctx.stroke();
     ctx.setLineDash([]);

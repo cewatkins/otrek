@@ -1,6 +1,6 @@
-import { i as __toESM } from "../_runtime.mjs";
+import { o as __toESM } from "../_runtime.mjs";
 import { K as require_react, b as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-D0GScu_6.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-3ix6K6ON.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var ctx = null;
@@ -80,7 +80,8 @@ var CLASSES = [
 		drones: 4,
 		droneDmg: 80,
 		mines: 5,
-		mineDmg: 170
+		mineDmg: 170,
+		crystals: 30
 	},
 	{
 		id: "LARSON",
@@ -113,7 +114,8 @@ var CLASSES = [
 		drones: 8,
 		droneDmg: 100,
 		mines: 8,
-		mineDmg: 180
+		mineDmg: 180,
+		crystals: 40
 	},
 	{
 		id: "RBOP",
@@ -144,7 +146,8 @@ var CLASSES = [
 		scan: 3900,
 		transwarp: false,
 		mines: 6,
-		mineDmg: 180
+		mineDmg: 180,
+		crystals: 30
 	},
 	{
 		id: "KEV12",
@@ -176,7 +179,8 @@ var CLASSES = [
 		transwarp: false,
 		drones: 15,
 		droneDmg: 120,
-		regenTorp: true
+		regenTorp: true,
+		crystals: 30
 	},
 	{
 		id: "WARBIRD",
@@ -208,7 +212,8 @@ var CLASSES = [
 		transwarp: false,
 		agonizer: true,
 		mines: 6,
-		mineDmg: 180
+		mineDmg: 180,
+		crystals: 30
 	},
 	{
 		id: "CDA180",
@@ -239,7 +244,9 @@ var CLASSES = [
 		scan: 4200,
 		transwarp: false,
 		drones: 10,
-		droneDmg: 130
+		droneDmg: 130,
+		droneVar: true,
+		crystals: 40
 	},
 	{
 		id: "BR5",
@@ -270,7 +277,8 @@ var CLASSES = [
 		scan: 3600,
 		transwarp: false,
 		drones: 6,
-		droneDmg: 80
+		droneDmg: 80,
+		crystals: 40
 	},
 	{
 		id: "DY600",
@@ -303,6 +311,138 @@ var CLASSES = [
 		drones: 12,
 		droneDmg: 80,
 		teleport: true
+	},
+	{
+		id: "IIA",
+		name: "Constitution II-A",
+		code: "II-A",
+		race: "Federation",
+		home: "SB1",
+		blurb: "The fast Constitution. Long photons, a mine belt, and a hold of eighty dilithium crystals. The warp core is small. Do not live at damage warp.",
+		cruise: 11,
+		maxWarp: 14,
+		turn: 1.05,
+		hull: 520,
+		shieldStr: 7.2,
+		energy: 90,
+		phaser: 70,
+		phaserRange: 700,
+		esi: false,
+		torpKind: "photon",
+		torpName: "Photon",
+		torpDmg: 110,
+		torpMin: 220,
+		torpMax: 1750,
+		torpSpeed: 1040,
+		torpHoming: .6,
+		magazine: 14,
+		torpCd: .85,
+		cloak: false,
+		scan: 5e3,
+		transwarp: false,
+		drones: 8,
+		droneDmg: 80,
+		mines: 6,
+		mineDmg: 170,
+		crystals: 80
+	},
+	{
+		id: "KPB13",
+		name: "K'vort",
+		code: "KPB-13",
+		race: "Klingon",
+		home: "SB2",
+		blurb: "Battlecruiser. Obliterators grow back, twenty drone racks in the sheet, and no cloak. She wins by staying in the fight.",
+		cruise: 10,
+		maxWarp: 13,
+		turn: 1.05,
+		hull: 580,
+		shieldStr: 7,
+		energy: 160,
+		phaser: 70,
+		phaserRange: 700,
+		esi: false,
+		torpKind: "obliterator",
+		torpName: "Obliterator",
+		torpDmg: 70,
+		torpMin: 40,
+		torpMax: 1100,
+		torpSpeed: 1180,
+		torpHoming: .25,
+		magazine: 18,
+		torpCd: .45,
+		cloak: false,
+		scan: 4e3,
+		transwarp: false,
+		drones: 12,
+		droneDmg: 90,
+		regenTorp: true,
+		crystals: 40
+	},
+	{
+		id: "CV97",
+		name: "Gorn Destroyer",
+		code: "CV-97",
+		race: "Gorn",
+		home: "SB4",
+		blurb: "Slow, thick, and cloaked. One plasma tube and a rack of heavy drones. The Gorn does not chase. She arrives.",
+		cruise: 9,
+		maxWarp: 11,
+		turn: .9,
+		hull: 620,
+		shieldStr: 7.4,
+		energy: 180,
+		phaser: 90,
+		phaserRange: 600,
+		esi: false,
+		torpKind: "plasma",
+		torpName: "Plasma",
+		torpDmg: 220,
+		torpMin: 200,
+		torpMax: 1600,
+		torpSpeed: 700,
+		torpHoming: 2.2,
+		magazine: 8,
+		torpCd: 1.6,
+		cloak: true,
+		scan: 4200,
+		transwarp: false,
+		drones: 10,
+		droneDmg: 100,
+		crystals: 40
+	},
+	{
+		id: "CDA120",
+		name: "Hideki",
+		code: "CDA-120",
+		race: "Cardassian",
+		home: "SB4",
+		blurb: "Light escort. Expanding-sphere phasers and variable-speed drones. Fast enough to leave the Galor behind, not tough enough to stay.",
+		cruise: 12,
+		maxWarp: 14,
+		turn: 1.4,
+		hull: 420,
+		shieldStr: 6,
+		energy: 140,
+		phaser: 80,
+		phaserRange: 500,
+		esi: true,
+		torpKind: "photon",
+		torpName: "Photon",
+		torpDmg: 100,
+		torpMin: 180,
+		torpMax: 1300,
+		torpSpeed: 980,
+		torpHoming: .45,
+		magazine: 12,
+		torpCd: .85,
+		cloak: false,
+		scan: 3800,
+		transwarp: false,
+		drones: 8,
+		droneDmg: 140,
+		droneVar: true,
+		crystals: 30
 	}
 ];
 /** Constructor numbers from rumour/jtrek Ship*.java. Parenthetical warp energy is the mtrek.com class table. */
@@ -466,6 +606,86 @@ var SHEETS = {
 		mines: "—",
 		crew: 85,
 		home: "Earth"
+	},
+	IIA: {
+		turn: 9,
+		cruise: 14,
+		damageWarp: 18,
+		warpEnergy: "50",
+		impulse: 40,
+		transwarp: "—",
+		warpCost: 2,
+		damagePct: 45,
+		shield: 17,
+		visibility: 100,
+		cloak: "—",
+		scan: 13e3,
+		phasers: "PH 50 · 0–700",
+		torpedoes: "Photon · 4 tubes · 40 · 500–1800",
+		drones: "10 × 400",
+		mines: "8 × 900",
+		crew: 432,
+		home: "Earth"
+	},
+	KPB13: {
+		turn: 10,
+		cruise: 13,
+		damageWarp: 17,
+		warpEnergy: "120 (150)",
+		impulse: 60,
+		transwarp: "—",
+		warpCost: 2,
+		damagePct: 50,
+		shield: 16,
+		visibility: 100,
+		cloak: "—",
+		scan: 8e3,
+		phasers: "PH 35 · 0–800",
+		torpedoes: "Obliterator · 5 tubes · 50 · regen · 300–1200",
+		drones: "20 × 400",
+		mines: "—",
+		crew: 150,
+		home: "Klinzhai"
+	},
+	CV97: {
+		turn: 9,
+		cruise: 11,
+		damageWarp: 13,
+		warpEnergy: "130 (160)",
+		impulse: 80,
+		transwarp: "—",
+		warpCost: 3,
+		damagePct: 40,
+		shield: 17,
+		visibility: 100,
+		cloak: "40s · pwr 80 · rgn 2",
+		scan: 1e4,
+		phasers: "PH 75 · 0–600",
+		torpedoes: "Plasma · 1 tube · 50 · 300–1200",
+		drones: "20 × 500",
+		mines: "—",
+		crew: 235,
+		home: "Gorn"
+	},
+	CDA120: {
+		turn: 12,
+		cruise: 14,
+		damageWarp: 16,
+		warpEnergy: "100 (140)",
+		impulse: 50,
+		transwarp: "—",
+		warpCost: 1,
+		damagePct: 55,
+		shield: 16,
+		visibility: 90,
+		cloak: "—",
+		scan: 8e3,
+		phasers: "ESI 40 · 0–500",
+		torpedoes: "Photon · 4 tubes · 40 · 500–1300",
+		drones: "15 × 800 · variable",
+		mines: "—",
+		crew: 74,
+		home: "Cardassia"
 	}
 };
 function classById(id) {
@@ -574,6 +794,20 @@ var BOTS = [
 		bias: .4,
 		home: "SB1",
 		skill: 3
+	},
+	{
+		name: "USS Yorktown",
+		classId: "IIA",
+		bias: .36,
+		home: "SB1",
+		skill: 3
+	},
+	{
+		name: "IKS Gr'oth",
+		classId: "KPB13",
+		bias: .7,
+		home: "SB2",
+		skill: 4
 	}
 ];
 function clamp(n, a, b) {
@@ -659,7 +893,9 @@ function makeShip(partial, t) {
 		born: t,
 		goalYaw: yaw,
 		goalWarp: 0,
-		missNote: 0
+		missNote: 0,
+		crystals: cls.crystals ?? 0,
+		remote: false
 	};
 }
 var TrekSim = class {
@@ -688,9 +924,11 @@ var TrekSim = class {
 	holeOpen = true;
 	holeLeft = 58;
 	onBank = null;
+	/** Fired when a local weapon tags a remote ship. Peer id, damage. */
+	onStrike = null;
 	edgeNote = 0;
 	noTgt = 0;
-	constructor(name, classId) {
+	constructor(name, classId, opts) {
 		const cls = classById(classId);
 		const home = BASES.find((b) => b.id === cls.home) ?? BASES[0];
 		this.player = makeShip({
@@ -703,38 +941,42 @@ var TrekSim = class {
 			y: home.y + 280
 		}, 0);
 		this.ships = [this.player];
-		const letters = [
-			"b",
-			"c",
-			"d",
-			"e",
-			"f",
-			"g"
-		];
-		BOTS.forEach((bot, i) => {
-			const b = BASES.find((x) => x.id === bot.home) ?? BASES[0];
-			const ang = i / BOTS.length * Math.PI * 2;
-			this.ships.push(makeShip({
-				name: bot.name,
-				classId: bot.classId,
-				letter: letters[i] ?? "z",
-				isPlayer: false,
-				home: bot.home,
-				x: clamp(b.x + Math.cos(ang) * 520, 200, 8800),
-				y: clamp(b.y + Math.sin(ang) * 520, 200, 8800),
-				bias: bot.bias,
-				skill: bot.skill
-			}, 0));
-		});
-		for (const ship of this.ships) {
-			if (ship.isPlayer) continue;
-			const dx = ship.x - this.player.x;
-			const dy = ship.y - this.player.y;
-			const d = Math.hypot(dx, dy) || 1;
-			if (d < 2e3) {
-				ship.x = clamp(this.player.x + dx / d * 2e3, 280, 8720);
-				ship.y = clamp(this.player.y + dy / d * 2e3, 280, 8720);
-				ship.yaw = yawTo(ship.x, ship.y, WORLD / 2, WORLD / 2);
+		if (opts?.bots !== false) {
+			const letters = [
+				"b",
+				"c",
+				"d",
+				"e",
+				"f",
+				"g",
+				"h",
+				"i"
+			];
+			BOTS.forEach((bot, i) => {
+				const b = BASES.find((x) => x.id === bot.home) ?? BASES[0];
+				const ang = i / BOTS.length * Math.PI * 2;
+				this.ships.push(makeShip({
+					name: bot.name,
+					classId: bot.classId,
+					letter: letters[i] ?? "z",
+					isPlayer: false,
+					home: bot.home,
+					x: clamp(b.x + Math.cos(ang) * 520, 200, 8800),
+					y: clamp(b.y + Math.sin(ang) * 520, 200, 8800),
+					bias: bot.bias,
+					skill: bot.skill
+				}, 0));
+			});
+			for (const ship of this.ships) {
+				if (ship.isPlayer) continue;
+				const dx = ship.x - this.player.x;
+				const dy = ship.y - this.player.y;
+				const d = Math.hypot(dx, dy) || 1;
+				if (d < 2e3) {
+					ship.x = clamp(this.player.x + dx / d * 2e3, 280, 8720);
+					ship.y = clamp(this.player.y + dy / d * 2e3, 280, 8720);
+					ship.yaw = yawTo(ship.x, ship.y, WORLD / 2, WORLD / 2);
+				}
 			}
 		}
 		let s = 77;
@@ -751,6 +993,8 @@ var TrekSim = class {
 		if (cls.agonizer) this.say("Agonizers ignore range. Each shot spends one torpedo.", "info");
 		else if (cls.regenTorp) this.say("Obliterators regenerate. One returns every two seconds.", "info");
 		else if (cls.teleport) this.say("Teleporter phasers shove you clear. Transwarp will not track.", "info");
+		else if (cls.esi) this.say("Expanding-sphere phasers hit every ship in range. A crowd weakens the shot.", "info");
+		else if ((cls.crystals ?? 0) >= 60) this.say("Dilithium soaks hits that punch the shields. Dock to refill the crystals.", "info");
 		else this.say("W/S warp · A/D turn · click a ship to lock · Space phasers · T torpedoes · . dock", "info");
 	}
 	held() {
@@ -771,6 +1015,64 @@ var TrekSim = class {
 	shipById(id) {
 		if (!id) return null;
 		return this.ships.find((s) => s.id === id) ?? null;
+	}
+	upsertRemote(peerId, pose) {
+		const id = `net:${peerId}`;
+		const alive = pose.alive !== false;
+		let ship = this.ships.find((s) => s.id === id);
+		if (!alive) {
+			if (ship?.alive) {
+				ship.alive = false;
+				ship.hull = 0;
+				this.burst(ship.x, ship.y, 16, true);
+				this.say(`${ship.name} destroyed.`, "alert");
+			}
+			return;
+		}
+		const x = clamp(Number(pose.x) || 0, 80, 8920);
+		const y = clamp(Number(pose.y) || 0, 80, 8920);
+		if (!ship) {
+			const letters = "bcdefghij";
+			const used = new Set(this.ships.map((s) => s.letter));
+			const letter = letters.split("").find((ch) => !used.has(ch)) ?? "z";
+			ship = makeShip({
+				name: String(pose.name ?? "Unknown").slice(0, 18),
+				classId: String(pose.classId ?? "EXCEL"),
+				letter,
+				isPlayer: false,
+				home: "SB1",
+				x,
+				y
+			}, this.t);
+			ship.id = id;
+			ship.remote = true;
+			this.ships.push(ship);
+			this.say(`${ship.name} entered the quadrant.`, "amber");
+		}
+		ship.remote = true;
+		ship.alive = true;
+		ship.name = String(pose.name ?? ship.name).slice(0, 18);
+		if (pose.classId && pose.classId !== ship.cls.id) ship.cls = classById(String(pose.classId));
+		ship.x = x;
+		ship.y = y;
+		ship.yaw = Number(pose.yaw) || 0;
+		ship.warp = clamp(Number(pose.warp) || 0, 0, 18);
+		ship.shield = clamp(Number(pose.shield) || 0, 0, 100);
+		ship.hull = clamp(Number(pose.hull) || 0, 0, ship.cls.hull);
+		ship.cloaked = Boolean(pose.cloaked);
+		ship.docked = Boolean(pose.docked);
+	}
+	dropRemotes(peerIds) {
+		const keep = new Set(peerIds.map((id) => `net:${id}`));
+		this.ships = this.ships.filter((s) => !s.remote || keep.has(s.id));
+		if (this.player.lockId?.startsWith("net:") && !keep.has(this.player.lockId)) this.player.lockId = null;
+	}
+	applyIncoming(raw, byName) {
+		if (!this.player.alive || this.over) return;
+		const dmg = Math.max(0, Math.min(500, raw));
+		const ghost = this.ships.find((s) => s.remote && s.name === byName) ?? null;
+		this.applyDamage(this.player, dmg, ghost);
+		this.say(`${byName} hits for ${Math.round(dmg)}.`, "alert");
 	}
 	visible(observer, target) {
 		if (!target.alive) return false;
@@ -910,6 +1212,7 @@ var TrekSim = class {
 			ship.magazine = ship.cls.magazine;
 			ship.drones = ship.cls.drones ?? 0;
 			ship.mines = ship.cls.mines ?? 0;
+			ship.crystals = ship.cls.crystals ?? 0;
 			ship.raiseLatch = false;
 			this.say(gained > 0 ? `Docked at ${base.name}. Banked ${gained} gold${bonus > 0 ? ` (${bonus} veteran bonus)` : ""}.` : `Docked at ${base.name}. Magazines full. Nothing new to bank.`, "amber");
 			sfx.dock();
@@ -1004,6 +1307,7 @@ var TrekSim = class {
 		return ship.cls.turn * (1 - .7 * Math.min(1, k)) + .18;
 	}
 	moveShip(ship, dt) {
+		if (ship.remote) return;
 		if (!ship.alive || ship.docked) {
 			ship.warp = 0;
 			return;
@@ -1192,7 +1496,7 @@ var TrekSim = class {
 		ship.drones -= 1;
 		ship.droneCd = 1.7;
 		ship.energy -= 6;
-		const spd = 640;
+		const spd = ship.cls.droneVar ? 420 + Math.random() * 520 : 640;
 		this.bolts.push({
 			x: ship.x + dirx * 40,
 			y: ship.y + diry * 40,
@@ -1214,11 +1518,27 @@ var TrekSim = class {
 	}
 	applyDamage(target, raw, attacker) {
 		if (!target.alive || target.docked || raw <= 0) return;
+		if (target.remote) {
+			if (attacker && attacker.isPlayer) {
+				attacker.dmgGiven += raw;
+				attacker.pendingDmg += raw;
+				if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * .5;
+			}
+			target.hitFlash = .18;
+			const peer = target.id.startsWith("net:") ? target.id.slice(4) : "";
+			if (peer && attacker?.isPlayer) this.onStrike?.(peer, raw);
+			return;
+		}
 		let left = raw;
 		if (target.shield > 0) {
 			const pct = Math.min(target.shield, left / target.cls.shieldStr);
 			target.shield -= pct;
 			left -= pct * target.cls.shieldStr;
+		}
+		if (left > 0 && target.crystals > 0) {
+			const soak = Math.min(target.crystals, left);
+			target.crystals -= soak;
+			left -= soak;
 		}
 		if (left > 0) target.hull -= left;
 		target.dmgTaken += raw;
@@ -1291,6 +1611,7 @@ var TrekSim = class {
 		const shift = held.has("ShiftLeft") || held.has("ShiftRight");
 		for (const ship of this.ships) {
 			if (!ship.alive) {
+				if (ship.remote) continue;
 				if (!ship.isPlayer && this.t >= ship.respawn && ship.respawn > 0) {
 					const base = this.baseById(ship.home);
 					ship.alive = true;
@@ -1306,9 +1627,14 @@ var TrekSim = class {
 					this.clearAboard(ship);
 					ship.drones = ship.cls.drones ?? 0;
 					ship.mines = ship.cls.mines ?? 0;
+					ship.crystals = ship.cls.crystals ?? 0;
 					ship.born = this.t;
 					this.say(`${ship.name} relaunched from ${base.name}.`, "info");
 				}
+				continue;
+			}
+			if (ship.remote) {
+				ship.hitFlash = Math.max(0, ship.hitFlash - dt);
 				continue;
 			}
 			ship.phaserCd = Math.max(0, ship.phaserCd - dt);
@@ -1361,6 +1687,7 @@ var TrekSim = class {
 					ship.magazine = ship.cls.magazine;
 					ship.drones = ship.cls.drones ?? 0;
 					ship.mines = ship.cls.mines ?? 0;
+					ship.crystals = ship.cls.crystals ?? 0;
 					const gained = this.goldAboard(ship);
 					this.clearAboard(ship);
 					ship.banked += gained;
@@ -1434,7 +1761,7 @@ var TrekSim = class {
 			}
 		}
 		for (const ship of this.ships) {
-			if (!ship.alive || ship.isPlayer) continue;
+			if (!ship.alive || ship.isPlayer || ship.remote) continue;
 			if (ship.docked) continue;
 			ship.aiAcc -= dt;
 			if (ship.aiAcc <= 0) {
@@ -1483,7 +1810,7 @@ var TrekSim = class {
 			this.say(this.holeOpen ? "Wormholes are open." : "Wormholes have gone dark.", "amber");
 		}
 		for (const ship of this.ships) {
-			if (!ship.alive || ship.docked || ship.holeCd > 0) continue;
+			if (!ship.alive || ship.docked || ship.holeCd > 0 || ship.remote) continue;
 			for (let i = 0; i < HOLES.length; i++) {
 				const h = HOLES[i];
 				if (this.dist(ship.x, ship.y, h.x, h.y) < 78) {
@@ -1552,7 +1879,7 @@ var TrekSim = class {
 			g.life -= dt;
 			let taken = false;
 			for (const ship of seekers) {
-				if (!ship.alive || ship.docked) continue;
+				if (!ship.alive || ship.docked || ship.remote) continue;
 				if (this.dist(ship.x, ship.y, g.x, g.y) < 56) {
 					ship.cargo += g.gold;
 					if (ship.isPlayer) {
@@ -1598,6 +1925,8 @@ var TrekSim = class {
 		p.courseYaw = null;
 		this.clearAboard(p);
 		p.drones = p.cls.drones ?? 0;
+		p.mines = p.cls.mines ?? 0;
+		p.crystals = p.cls.crystals ?? 0;
 		p.born = this.t;
 		p.phaserCd = 0;
 		p.torpCd = .3;
@@ -1670,6 +1999,8 @@ var TrekSim = class {
 			dronesMax: p.cls.drones ?? 0,
 			mines: p.mines,
 			minesMax: p.cls.mines ?? 0,
+			crystals: p.crystals,
+			crystalsMax: p.cls.crystals ?? 0,
 			holeOpen: this.holeOpen,
 			cloakOn: p.cloaked,
 			canCloak: p.cls.cloak,
@@ -1724,21 +2055,76 @@ function toScreen(cam, x, y) {
 		y: (y - cam.y) * cam.scale + cam.h / 2
 	};
 }
-function shipPoly(ctx, yaw, x, y, scale = 1) {
-	const pts = [
-		[0, -16],
-		[-9, 11],
-		[0, 6],
-		[9, 11]
-	];
+function paintShip(ctx, kind, yaw, x, y, scale) {
+	ctx.save();
+	ctx.translate(x, y);
+	ctx.rotate(-yaw);
+	ctx.scale(scale, scale);
 	ctx.beginPath();
-	pts.forEach(([lx, ly], i) => {
-		const wx = (lx * Math.cos(yaw) + ly * Math.sin(yaw)) * scale;
-		const wy = (-lx * Math.sin(yaw) + ly * Math.cos(yaw)) * scale;
-		if (i === 0) ctx.moveTo(x + wx, y + wy);
-		else ctx.lineTo(x + wx, y + wy);
-	});
-	ctx.closePath();
+	const fed = () => {
+		ctx.ellipse(0, -2, 7, 9, 0, 0, Math.PI * 2);
+		ctx.rect(-3, 2, 6, 10);
+		ctx.rect(-12, 4, 5, 12);
+		ctx.rect(7, 4, 5, 12);
+	};
+	const bird = () => {
+		ctx.moveTo(0, -16);
+		ctx.lineTo(-16, 8);
+		ctx.lineTo(-6, 4);
+		ctx.lineTo(0, 12);
+		ctx.lineTo(6, 4);
+		ctx.lineTo(16, 8);
+		ctx.closePath();
+	};
+	const klingon = () => {
+		ctx.moveTo(0, -16);
+		ctx.lineTo(-4, -4);
+		ctx.lineTo(-14, 6);
+		ctx.lineTo(-4, 2);
+		ctx.lineTo(-3, 12);
+		ctx.lineTo(3, 12);
+		ctx.lineTo(4, 2);
+		ctx.lineTo(14, 6);
+		ctx.lineTo(4, -4);
+		ctx.closePath();
+	};
+	const galor = () => {
+		ctx.moveTo(0, -12);
+		ctx.lineTo(-14, 2);
+		ctx.lineTo(-8, 10);
+		ctx.lineTo(0, 4);
+		ctx.lineTo(8, 10);
+		ctx.lineTo(14, 2);
+		ctx.closePath();
+	};
+	const dart = () => {
+		ctx.moveTo(0, -15);
+		ctx.lineTo(-6, 12);
+		ctx.lineTo(0, 7);
+		ctx.lineTo(6, 12);
+		ctx.closePath();
+	};
+	const barge = () => {
+		ctx.rect(-8, -12, 16, 24);
+		ctx.rect(-14, -4, 5, 14);
+		ctx.rect(9, -4, 5, 14);
+	};
+	const gorn = () => {
+		ctx.moveTo(0, -14);
+		ctx.lineTo(-16, 4);
+		ctx.lineTo(-10, 14);
+		ctx.lineTo(10, 14);
+		ctx.lineTo(16, 4);
+		ctx.closePath();
+	};
+	if (kind === "DY600") barge();
+	else if (kind === "RBOP" || kind === "WARBIRD") bird();
+	else if (kind === "KEV12" || kind === "KPB13") klingon();
+	else if (kind === "CDA180" || kind === "CDA120") galor();
+	else if (kind === "BR5" || kind === "BR1000") dart();
+	else if (kind === "CV97") gorn();
+	else fed();
+	ctx.restore();
 }
 function drawTactical(ctx, sim, cam) {
 	const { w, h } = cam;
@@ -1790,7 +2176,7 @@ function drawTactical(ctx, sim, cam) {
 		ctx.stroke();
 	}
 	ctx.setLineDash([]);
-	for (const hole of HOLES) {
+	HOLES.forEach((hole, i) => {
 		const p = toScreen(cam, hole.x, hole.y);
 		const open = sim.holeOpen;
 		ctx.strokeStyle = open ? AMBER : MUTED;
@@ -1805,8 +2191,8 @@ function drawTactical(ctx, sim, cam) {
 		ctx.globalAlpha = 1;
 		ctx.fillStyle = open ? MUTED : LINE;
 		ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-		ctx.fillText(open ? "WORMHOLE" : "WORMHOLE DARK", p.x + 22, p.y + 4);
-	}
+		ctx.fillText(open ? i === 0 ? "ALPHA MOUTH" : "BETA MOUTH" : "WORMHOLE DARK", p.x + 22, p.y + 4);
+	});
 	for (const planet of PLANETS) {
 		const p = toScreen(cam, planet.x, planet.y);
 		ctx.fillStyle = "#221c14";
@@ -1904,9 +2290,9 @@ function drawTactical(ctx, sim, cam) {
 		}
 		ctx.lineWidth = ship.hitFlash > 0 ? 2.5 : 1.5;
 		ctx.strokeStyle = ship.hitFlash > 0 ? FG : color;
-		ctx.fillStyle = mine ? "#2a2114" : "#2a1410";
+		ctx.fillStyle = mine ? "#241c12" : "#1a140f";
 		if (ship.docked) ctx.setLineDash([3, 3]);
-		shipPoly(ctx, ship.yaw, p.x, p.y, mine ? 1.05 : 1);
+		paintShip(ctx, ship.cls.id, ship.yaw, p.x, p.y, mine ? 1.55 : 1.35);
 		ctx.fill();
 		ctx.stroke();
 		ctx.setLineDash([]);
@@ -2047,15 +2433,537 @@ function saveScore(row) {
 	write(data);
 	return data.scores;
 }
+var FAST_POLL_MS = 400;
+var IDLE_POLL_MS = 2e3;
+var PING_INTERVAL_MS = 2e3;
+var STALL_MS = 1e4;
+var MAX_RECOVERY_ATTEMPTS = 3;
+var SIGNAL_RETRY_DELAYS_MS = [250, 750];
+function defaultIceServers() {
+	return [{ urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }];
+}
+var P2PRoom = class {
+	opts;
+	peers = /* @__PURE__ */ new Map();
+	/** Per-remote-peer signal delivery chains (order-preserving). */
+	signalQueues = /* @__PURE__ */ new Map();
+	cursor = 0;
+	pollTimer = null;
+	pingTimer = null;
+	closed = false;
+	everPolled = false;
+	lastPeersFingerprint = "";
+	constructor(opts) {
+		this.opts = opts;
+	}
+	/**
+	* The first poll IS the join: it registers this peer and returns the
+	* roster. A failed first poll (cold DB, offline tab) must not strand the
+	* room: the loop and timers start regardless and the next poll retries.
+	*/
+	async join() {
+		try {
+			await this.pollOnce();
+		} catch {}
+		if (this.closed) return;
+		this.schedulePoll(this.anyPairConnecting() ? FAST_POLL_MS : IDLE_POLL_MS);
+		this.pingTimer = setInterval(() => {
+			this.pingAll();
+			this.watchdog();
+		}, PING_INTERVAL_MS);
+	}
+	close() {
+		this.closed = true;
+		if (this.pollTimer) clearTimeout(this.pollTimer);
+		if (this.pingTimer) clearInterval(this.pingTimer);
+		for (const slot of this.peers.values()) slot.pc.close();
+		this.peers.clear();
+		fetch("/api/rtc", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				op: "leave",
+				room: this.opts.room,
+				peer: this.opts.selfId
+			}),
+			keepalive: true
+		}).catch(() => {});
+	}
+	/** Send on the unreliable game-state channel (drops stale packets). */
+	broadcast(data) {
+		const wire = JSON.stringify({
+			t: "d",
+			d: data
+		});
+		for (const slot of this.peers.values()) if (slot.state?.readyState === "open") slot.state.send(wire);
+	}
+	/** Send reliably (ordered) to one peer, or to all when peerId is omitted. */
+	send(data, peerId) {
+		const wire = JSON.stringify({
+			t: "d",
+			d: data
+		});
+		const targets = peerId ? [this.peers.get(peerId)] : [...this.peers.values()];
+		for (const slot of targets) if (slot?.reliable?.readyState === "open") slot.reliable.send(wire);
+	}
+	peerList() {
+		return [...this.peers.values()].map((s) => ({ ...s.info }));
+	}
+	schedulePoll(delay) {
+		if (this.closed) return;
+		if (this.pollTimer) clearTimeout(this.pollTimer);
+		this.pollTimer = setTimeout(() => void this.poll(), delay);
+	}
+	anyPairConnecting() {
+		for (const s of this.peers.values()) {
+			if (s.terminal) continue;
+			if (s.info.connectionState !== "connected") return true;
+		}
+		return false;
+	}
+	async pollOnce() {
+		const params = new URLSearchParams({
+			room: this.opts.room,
+			peer: this.opts.selfId,
+			name: this.opts.name ?? "",
+			since: String(this.cursor)
+		});
+		const res = await fetch(`/api/rtc?${params}`);
+		if (this.closed) return;
+		if (!res.ok) throw new Error(`signaling poll failed: ${res.status}`);
+		const body = await res.json();
+		if (this.closed) return;
+		if (!this.everPolled) {
+			this.everPolled = true;
+			this.opts.onConnected?.();
+		}
+		this.reconcileRoster(body.peers);
+		const roster = new Set(body.peers.map((p) => p.id));
+		for (const sig of body.signals) {
+			this.cursor = Math.max(this.cursor, sig.id);
+			await this.onSignal(sig.from, sig.kind, sig.payload, roster);
+			if (this.closed) return;
+		}
+	}
+	async poll() {
+		if (this.closed) return;
+		try {
+			await this.pollOnce();
+		} catch {}
+		this.schedulePoll(this.anyPairConnecting() ? FAST_POLL_MS : IDLE_POLL_MS);
+	}
+	reconcileRoster(peers) {
+		const alive = new Set(peers.map((p) => p.id));
+		for (const p of peers) {
+			if (p.id === this.opts.selfId) continue;
+			const existing = this.peers.get(p.id);
+			if (existing) existing.info.name = p.name;
+			else this.connectTo(p.id, p.name, this.opts.selfId > p.id);
+		}
+		for (const [id, slot] of this.peers) if (!alive.has(id)) {
+			slot.pc.close();
+			this.peers.delete(id);
+		}
+		this.emitPeers();
+	}
+	connectTo(peerId, name, initiator) {
+		if (this.closed) return null;
+		const pc = new RTCPeerConnection({ iceServers: this.opts.iceServers ?? defaultIceServers() });
+		const slot = {
+			pc,
+			makingOffer: false,
+			ignoreOffer: false,
+			pendingCandidates: [],
+			lastProgressAt: Date.now(),
+			recoveryAttempts: 0,
+			info: {
+				id: peerId,
+				name,
+				connectionState: pc.connectionState,
+				candidateType: null,
+				rttMs: null
+			}
+		};
+		this.peers.set(peerId, slot);
+		pc.onicecandidate = (e) => {
+			if (e.candidate) this.sendSignal(peerId, "ice", e.candidate.toJSON());
+		};
+		pc.onconnectionstatechange = () => {
+			slot.info.connectionState = pc.connectionState;
+			if (pc.connectionState === "connecting" || pc.connectionState === "connected") slot.lastProgressAt = Date.now();
+			if (pc.connectionState === "connected") {
+				slot.recoveryAttempts = 0;
+				slot.terminal = false;
+				this.readCandidateType(slot);
+			}
+			this.emitPeers();
+			if (pc.connectionState === "failed") pc.restartIce();
+			if (pc.connectionState === "failed" || pc.connectionState === "disconnected") this.schedulePoll(FAST_POLL_MS);
+		};
+		pc.onnegotiationneeded = async () => {
+			try {
+				slot.makingOffer = true;
+				await pc.setLocalDescription();
+				await this.sendSignal(peerId, "offer", pc.localDescription.toJSON());
+			} catch {} finally {
+				slot.makingOffer = false;
+			}
+		};
+		pc.ondatachannel = (e) => this.attachChannel(slot, e.channel);
+		if (initiator) {
+			this.attachChannel(slot, pc.createDataChannel("state", {
+				ordered: false,
+				maxRetransmits: 0
+			}));
+			this.attachChannel(slot, pc.createDataChannel("reliable", { ordered: true }));
+		}
+		return slot;
+	}
+	attachChannel(slot, channel) {
+		if (channel.label === "state") slot.state = channel;
+		else slot.reliable = channel;
+		channel.onopen = () => {
+			slot.lastProgressAt = Date.now();
+		};
+		channel.onmessage = (e) => {
+			let msg;
+			try {
+				msg = JSON.parse(e.data);
+			} catch {
+				return;
+			}
+			if (msg.t === "ping") {
+				if (slot.state?.readyState === "open") slot.state.send(JSON.stringify({ t: "pong" }));
+			} else if (msg.t === "pong") {
+				if (slot.pingSentAt) {
+					slot.info.rttMs = Math.round(performance.now() - slot.pingSentAt);
+					slot.pingSentAt = void 0;
+					this.emitPeers();
+				}
+			} else this.opts.onMessage?.(slot.info.id, msg.d, channel.label === "state" ? "state" : "reliable");
+		};
+	}
+	/** Apply buffered ICE candidates once a remote description is in place. */
+	async flushPendingCandidates(slot) {
+		while (slot.pendingCandidates.length > 0) {
+			const candidate = slot.pendingCandidates.shift();
+			try {
+				await slot.pc.addIceCandidate(candidate);
+			} catch (err) {
+				if (!slot.ignoreOffer) console.warn("[p2p] addIceCandidate failed:", err);
+			}
+			if (this.closed) return;
+		}
+	}
+	async onSignal(from, kind, payload, roster) {
+		if (this.closed) return;
+		let slot = this.peers.get(from);
+		if (!slot) {
+			if (!roster.has(from)) return;
+			const created = this.connectTo(from, "", false);
+			if (!created) return;
+			slot = created;
+		}
+		const polite = this.opts.selfId < from;
+		try {
+			if (kind === "offer" || kind === "answer") {
+				const description = payload;
+				const collision = kind === "offer" && (slot.makingOffer || slot.pc.signalingState !== "stable");
+				slot.ignoreOffer = !polite && collision;
+				if (slot.ignoreOffer) return;
+				try {
+					await slot.pc.setRemoteDescription(description);
+				} catch (err) {
+					if (kind !== "offer" || slot.recreatedForOffer) throw err;
+					const attempts = slot.recoveryAttempts;
+					const name = slot.info.name;
+					slot.pc.close();
+					this.peers.delete(from);
+					const fresh = this.connectTo(from, name, false);
+					if (!fresh) return;
+					fresh.recoveryAttempts = attempts;
+					fresh.recreatedForOffer = true;
+					slot = fresh;
+					await slot.pc.setRemoteDescription(description);
+				}
+				if (this.closed) return;
+				await this.flushPendingCandidates(slot);
+				if (this.closed) return;
+				if (kind === "offer") {
+					await slot.pc.setLocalDescription();
+					if (this.closed) return;
+					await this.sendSignal(from, "answer", slot.pc.localDescription.toJSON());
+				}
+			} else if (kind === "ice") {
+				const candidate = payload;
+				if (!slot.pc.remoteDescription) {
+					slot.pendingCandidates.push(candidate);
+					return;
+				}
+				try {
+					await slot.pc.addIceCandidate(candidate);
+				} catch (err) {
+					if (!slot.ignoreOffer) console.warn("[p2p] addIceCandidate failed:", err);
+				}
+			}
+		} catch {}
+	}
+	/**
+	* Signals are serialized per remote peer (a candidate must never overtake
+	* its SDP into the DB) and retried on failure with short backoff.
+	*/
+	sendSignal(to, kind, payload) {
+		const next = (this.signalQueues.get(to) ?? Promise.resolve()).then(() => this.postSignal(to, kind, payload));
+		this.signalQueues.set(to, next.catch(() => {}));
+		return next;
+	}
+	async postSignal(to, kind, payload) {
+		for (let attempt = 0;; attempt++) {
+			if (this.closed) return;
+			try {
+				const res = await fetch("/api/rtc", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						op: "signal",
+						room: this.opts.room,
+						from: this.opts.selfId,
+						to,
+						kind,
+						payload
+					})
+				});
+				if (res.ok) return;
+				throw new Error(`signal POST failed: ${res.status}`);
+			} catch (err) {
+				if (attempt >= SIGNAL_RETRY_DELAYS_MS.length) {
+					console.warn(`[p2p] signal ${kind} to ${to} failed after retries`, err);
+					return;
+				}
+				await new Promise((r) => setTimeout(r, SIGNAL_RETRY_DELAYS_MS[attempt]));
+			}
+		}
+	}
+	pingAll() {
+		const wire = JSON.stringify({ t: "ping" });
+		for (const slot of this.peers.values()) {
+			if (slot.state?.readyState !== "open") continue;
+			const stale = slot.pingSentAt !== void 0 && performance.now() - slot.pingSentAt > 2 * PING_INTERVAL_MS;
+			if (slot.pingSentAt === void 0 || stale) {
+				slot.pingSentAt = performance.now();
+				slot.state.send(wire);
+			}
+		}
+	}
+	/**
+	* Stuck-pair recovery, piggybacked on the ping interval. A pair that has
+	* made no progress for STALL_MS gets rebuilt by the dialer with a FRESH
+	* RTCPeerConnection (new DTLS identity — fixes the suspend/resume
+	* fingerprint wedge). After MAX_RECOVERY_ATTEMPTS the pair is terminal:
+	* visible to the app as its last connectionState, ignored by fast-poll.
+	*/
+	watchdog() {
+		if (this.closed) return;
+		const now = Date.now();
+		for (const [peerId, slot] of this.peers) {
+			const live = slot.pc.connectionState;
+			if (live !== slot.info.connectionState) {
+				slot.info.connectionState = live;
+				if (live === "connecting" || live === "connected") slot.lastProgressAt = now;
+				this.emitPeers();
+			}
+			if (slot.terminal || live === "connected") continue;
+			if (now - slot.lastProgressAt <= STALL_MS) continue;
+			if (slot.recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+				slot.terminal = true;
+				this.emitPeers();
+				continue;
+			}
+			slot.recoveryAttempts += 1;
+			slot.lastProgressAt = now;
+			if (this.opts.selfId > peerId) {
+				const { name } = slot.info;
+				const attempts = slot.recoveryAttempts;
+				slot.pc.close();
+				this.peers.delete(peerId);
+				const fresh = this.connectTo(peerId, name, true);
+				if (fresh) fresh.recoveryAttempts = attempts;
+				this.schedulePoll(FAST_POLL_MS);
+			}
+		}
+	}
+	async readCandidateType(slot) {
+		try {
+			const stats = await slot.pc.getStats();
+			let selected;
+			stats.forEach((s) => {
+				if (s.type === "candidate-pair" && s.nominated) selected = s;
+			});
+			const localId = selected?.localCandidateId;
+			if (localId) {
+				const local = stats.get(localId);
+				slot.info.candidateType = local?.candidateType ?? null;
+				this.emitPeers();
+			}
+		} catch {}
+	}
+	emitPeers() {
+		const list = this.peerList();
+		const fingerprint = JSON.stringify(list.map((p) => [
+			p.id,
+			p.name,
+			p.connectionState,
+			p.candidateType,
+			p.rttMs
+		]));
+		if (fingerprint === this.lastPeersFingerprint) return;
+		this.lastPeersFingerprint = fingerprint;
+		this.opts.onPeersChanged?.(list);
+	}
+};
+function useP2PRoom(options = {}) {
+	const [selfId] = (0, import_react.useState)(() => `p-${Math.random().toString(36).slice(2, 10)}`);
+	const [room] = (0, import_react.useState)(() => (options.room ?? "mtrek-open").slice(0, 64));
+	const [name] = (0, import_react.useState)(() => options.name ?? selfId);
+	const [peers, setPeers] = (0, import_react.useState)([]);
+	const [joined, setJoined] = (0, import_react.useState)(false);
+	const roomRef = (0, import_react.useRef)(null);
+	const listeners = (0, import_react.useRef)(/* @__PURE__ */ new Set());
+	(0, import_react.useEffect)(() => {
+		const p2p = new P2PRoom({
+			room,
+			selfId,
+			name,
+			onPeersChanged: setPeers,
+			onMessage: (from, data, channel) => {
+				for (const fn of listeners.current) fn(from, data, channel);
+			},
+			onConnected: () => setJoined(true)
+		});
+		roomRef.current = p2p;
+		p2p.join();
+		return () => {
+			roomRef.current = null;
+			p2p.close();
+		};
+	}, [
+		room,
+		selfId,
+		name
+	]);
+	return {
+		selfId,
+		room,
+		peers,
+		joined,
+		broadcast: (0, import_react.useCallback)((data) => roomRef.current?.broadcast(data), []),
+		send: (0, import_react.useCallback)((data, peerId) => roomRef.current?.send(data, peerId), []),
+		onMessage: (0, import_react.useCallback)((fn) => {
+			listeners.current.add(fn);
+			return () => {
+				listeners.current.delete(fn);
+			};
+		}, [])
+	};
+}
+function NetLink({ room, name, simRef, sendRef }) {
+	const p2p = useP2PRoom({
+		room: `mtrek-${room}`.slice(0, 64),
+		name
+	});
+	const [label, setLabel] = (0, import_react.useState)("linking");
+	(0, import_react.useEffect)(() => {
+		sendRef.current = (data) => p2p.send(data);
+		return () => {
+			sendRef.current = null;
+		};
+	}, [p2p.send, sendRef]);
+	(0, import_react.useEffect)(() => {
+		const sim = simRef.current;
+		if (!sim) return;
+		sim.onStrike = (peer, raw) => {
+			if (peer) p2p.send({
+				k: "hit",
+				to: peer,
+				dmg: raw,
+				by: sim.player.name
+			});
+		};
+		return () => {
+			sim.onStrike = null;
+		};
+	}, [p2p.send, simRef]);
+	(0, import_react.useEffect)(() => p2p.onMessage((from, data) => {
+		if (!data || typeof data !== "object") return;
+		const msg = data;
+		const sim = simRef.current;
+		if (!sim) return;
+		if (msg.k === "pose") sim.upsertRemote(from, msg);
+		if (msg.k === "hit" && msg.to === p2p.selfId) sim.applyIncoming(Number(msg.dmg) || 0, String(msg.by ?? "someone"));
+		if (msg.k === "hail" && msg.text) sim.say(String(msg.text).slice(0, 96), "amber");
+	}), [
+		p2p.onMessage,
+		p2p.selfId,
+		simRef
+	]);
+	(0, import_react.useEffect)(() => {
+		let last = 0;
+		let raf = 0;
+		const loop = (now) => {
+			if (now - last > 100) {
+				last = now;
+				const sim = simRef.current;
+				const p = sim?.player;
+				if (p) p2p.broadcast({
+					k: "pose",
+					name: p.name,
+					classId: p.cls.id,
+					x: p.x,
+					y: p.y,
+					yaw: p.yaw,
+					warp: p.warp,
+					shield: p.shield,
+					hull: p.hull,
+					cloaked: p.cloaked,
+					docked: p.docked,
+					alive: p.alive && !sim?.over
+				});
+			}
+			raf = requestAnimationFrame(loop);
+		};
+		raf = requestAnimationFrame(loop);
+		return () => cancelAnimationFrame(raf);
+	}, [p2p.broadcast, simRef]);
+	(0, import_react.useEffect)(() => {
+		simRef.current?.dropRemotes(p2p.peers.map((peer) => peer.id));
+		const linked = p2p.peers.filter((peer) => peer.connectionState === "connected").length;
+		const failed = p2p.peers.filter((peer) => peer.connectionState === "failed").length;
+		setLabel(!p2p.joined ? "linking" : failed && !linked ? "no path" : linked ? `${linked} linked` : "waiting");
+	}, [
+		p2p.joined,
+		p2p.peers,
+		simRef
+	]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+		className: "pointer-events-none absolute top-14 left-3 z-10 font-mono text-xs text-amber",
+		children: [
+			"ROOM ",
+			room,
+			" · ",
+			label
+		]
+	});
+}
 function pad3(n) {
 	return Math.round(n).toString().padStart(3, "0");
 }
 function clock(s) {
 	return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
 }
-function Bridge({ name, classId, onLeave }) {
+function Bridge({ name, classId, room, onLeave }) {
 	const canvasRef = (0, import_react.useRef)(null);
 	const simRef = (0, import_react.useRef)(null);
+	const netSend = (0, import_react.useRef)(null);
 	const [snap, setSnap] = (0, import_react.useState)(null);
 	const [paused, setPaused] = (0, import_react.useState)(false);
 	const [help, setHelp] = (0, import_react.useState)(false);
@@ -2063,7 +2971,7 @@ function Bridge({ name, classId, onLeave }) {
 	const pausedRef = (0, import_react.useRef)(false);
 	pausedRef.current = paused || help;
 	(0, import_react.useEffect)(() => {
-		const sim = new TrekSim(name, classId);
+		const sim = new TrekSim(name, classId, { bots: !room });
 		simRef.current = sim;
 		sim.onBank = (ship) => {
 			saveScore({
@@ -2217,6 +3125,10 @@ function Bridge({ name, classId, onLeave }) {
 		const sim = simRef.current;
 		if (!sim) return;
 		sim.hail(hail);
+		if (hail.trim()) netSend.current?.({
+			k: "hail",
+			text: `${name}: ${hail.trim().slice(0, 80)}`
+		});
 		setHail("");
 		setSnap(sim.snapshot());
 	};
@@ -2227,9 +3139,9 @@ function Bridge({ name, classId, onLeave }) {
 				className: "flex shrink-0 items-center justify-between gap-3 border-b border-line px-3 py-2 md:px-4",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "min-w-0",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
 						className: "font-mono text-xs tracking-widest text-amber",
-						children: "MTREK · QUADRANT ALPHA"
+						children: ["MTREK · ", room ? `ROOM ${room}` : "SOLO QUADRANT"]
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
 						className: "truncate font-sans text-sm font-semibold",
 						children: [
@@ -2270,6 +3182,12 @@ function Bridge({ name, classId, onLeave }) {
 					]
 				})]
 			}),
+			room ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NetLink, {
+				room,
+				name,
+				simRef,
+				sendRef: netSend
+			}) : null,
 			snap && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex shrink-0 gap-3 overflow-x-auto border-b border-line px-3 py-2 font-mono text-xs md:hidden",
 				children: [
@@ -2287,6 +3205,7 @@ function Bridge({ name, classId, onLeave }) {
 						Math.round(snap.shield),
 						"%"
 					] }),
+					snap.crystalsMax > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["XL ", snap.crystals] }),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
 						className: "text-amber",
 						children: ["+", snap.unbanked]
@@ -2502,7 +3421,7 @@ function Bridge({ name, classId, onLeave }) {
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Click a ship to lock. Locked torpedoes curve in. Unlocked ones fly straight." }),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Phasers need a lock or a target in the forward arc. ESI hits everyone in range. Agonizers are flat and spend a torpedo. G launches a drone. M drops a mine." }),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Dock inside 100 units under warp 1.4. Gold paid there is (damage + veteran bonus) / 10. Klingon obliterators return one every two seconds." }),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "R raises shields. Shift+R drops them. C repairs the hull. Planets trickle dilithium." }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "R raises shields. Shift+R drops them. C repairs the hull. Dilithium soaks damage that gets through the shields and refills when you dock. Planets trickle energy." }),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Wormholes open and shut about once a minute. Cloaked ships cannot enter, and the same ship must wait a minute to transit again." })
 							]
 						}),
@@ -2567,6 +3486,10 @@ function Status({ snap }) {
 			snap.minesMax > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Stat, {
 				k: "MINES",
 				v: `${snap.mines} / ${snap.minesMax}`
+			}),
+			snap.crystalsMax > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Stat, {
+				k: "CRYSTALS",
+				v: `${snap.crystals} / ${snap.crystalsMax}`
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Stat, {
 				k: "WORMHOLE",
@@ -2757,17 +3680,35 @@ function Shipyard({ onStart }) {
 	const [name, setName] = (0, import_react.useState)("USS Intrepid");
 	const [scores, setScores] = (0, import_react.useState)([]);
 	const [real, setReal] = (0, import_react.useState)(true);
+	const [room, setRoom] = (0, import_react.useState)("");
 	const selected = CLASSES.find((c) => c.id === classId) ?? CLASSES[0];
 	(0, import_react.useEffect)(() => {
 		const saved = loadCallsign();
 		setName(saved.name);
 		if (CLASSES.some((c) => c.id === saved.classId)) setClassId(saved.classId);
 		setScores(loadScores());
+		const clean = (new URLSearchParams(window.location.search).get("room") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+		if (clean) setRoom(clean);
 	}, []);
 	const launch = () => {
 		const trimmed = name.trim().slice(0, 18) || "USS Intrepid";
+		const code = room.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 		saveCallsign(trimmed, selected.id);
-		onStart(trimmed, selected.id);
+		const url = new URL(window.location.href);
+		if (code) url.searchParams.set("room", code);
+		else url.searchParams.delete("room");
+		window.history.replaceState(null, "", url);
+		onStart(trimmed, selected.id, code || null);
+	};
+	const copyLink = async () => {
+		const code = room.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+		if (!code) return;
+		const url = new URL(window.location.href);
+		url.searchParams.set("room", code);
+		window.history.replaceState(null, "", url);
+		try {
+			await navigator.clipboard.writeText(url.toString());
+		} catch {}
 	};
 	const sheet = SHEETS[selected.id];
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -3060,6 +4001,10 @@ function Shipyard({ onStart }) {
 										/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Cell, {
 											k: "MINES",
 											v: selected.mines ? `${selected.mines} × ${selected.mineDmg ?? 0}` : "—"
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Cell, {
+											k: "CRYSTALS",
+											v: selected.crystals ? String(selected.crystals) : "—"
 										})
 									]
 								})
@@ -3129,28 +4074,73 @@ function Shipyard({ onStart }) {
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", {
-				className: "flex shrink-0 items-end gap-3 border-t border-line px-4 py-3 md:px-8",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
-					className: "min-w-0 flex-1",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "flex shrink-0 flex-col gap-2 border-t border-line px-4 py-3 md:px-8",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex flex-wrap items-end gap-2",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+								className: "min-w-0 flex-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "font-mono text-xs text-muted",
+									children: "ROOM CODE"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									value: room,
+									onChange: (e) => setRoom(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)),
+									maxLength: 6,
+									placeholder: "Solo if empty",
+									"aria-label": "Room code",
+									className: "mt-1 w-full border border-line bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-amber"
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								onClick: () => {
+									const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+									let code = "";
+									for (let i = 0; i < 4; i++) code += alphabet[Math.floor(Math.random() * 32)];
+									setRoom(code);
+								},
+								className: "h-11 border border-line px-3 font-mono text-xs",
+								children: "New room"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								onClick: () => void copyLink(),
+								className: "h-11 border border-line px-3 font-mono text-xs",
+								children: "Copy link"
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 						className: "font-mono text-xs text-muted",
-						children: "SHIP NAME"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
-						value: name,
-						onChange: (e) => setName(e.target.value),
-						onKeyDown: (e) => {
-							if (e.key === "Enter") launch();
-						},
-						maxLength: 18,
-						"aria-label": "Ship name",
-						className: "mt-1 w-full border border-line bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-amber"
-					})]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					type: "button",
-					onClick: launch,
-					className: "h-11 shrink-0 bg-amber px-6 font-sans text-sm font-semibold text-bg",
-					children: "Start"
-				})]
+						children: "Same code, same site, shared quadrant. Up to eight ships. The handshake stays on this server. The fight goes browser to browser, so a published copy hosts itself."
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex items-end gap-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+							className: "min-w-0 flex-1",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "font-mono text-xs text-muted",
+								children: "SHIP NAME"
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+								value: name,
+								onChange: (e) => setName(e.target.value),
+								onKeyDown: (e) => {
+									if (e.key === "Enter") launch();
+								},
+								maxLength: 18,
+								"aria-label": "Ship name",
+								className: "mt-1 w-full border border-line bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-amber"
+							})]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: launch,
+							className: "h-11 shrink-0 bg-amber px-6 font-sans text-sm font-semibold text-bg",
+							children: "Start"
+						})]
+					})
+				]
 			})
 		]
 	});
@@ -3169,14 +4159,16 @@ function Cell({ k, v, wide = false }) {
 }
 function Home() {
 	const [flight, setFlight] = (0, import_react.useState)(null);
-	if (!flight) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Shipyard, { onStart: (name, classId) => setFlight({
+	if (!flight) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Shipyard, { onStart: (name, classId, room) => setFlight({
 		name,
 		classId,
-		id: Date.now()
+		id: Date.now(),
+		room
 	}) });
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Bridge, {
 		name: flight.name,
 		classId: flight.classId,
+		room: flight.room,
 		onLeave: () => setFlight(null)
 	}, flight.id);
 }

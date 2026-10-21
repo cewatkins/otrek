@@ -100,6 +100,10 @@ export type Ship = {
   goalYaw: number;
   goalWarp: number;
   missNote: number;
+  /** Dilithium still in the hold. Soaks damage that gets through shields. */
+  crystals: number;
+  /** Another player's ship. Pose comes from them; this client does not fly it. */
+  remote: boolean;
 };
 
 export type RosterRow = {
@@ -149,6 +153,8 @@ export type Snapshot = {
   dronesMax: number;
   mines: number;
   minesMax: number;
+  crystals: number;
+  crystalsMax: number;
   holeOpen: boolean;
   cloakOn: boolean;
   canCloak: boolean;
@@ -205,6 +211,8 @@ const BOTS: { name: string; classId: string; bias: number; home: string; skill: 
   { name: "CDS Galor", classId: "CDA180", bias: 0.62, home: "SB4", skill: 3 },
   { name: "USS Hood", classId: "EXCEL", bias: 0.34, home: "SB1", skill: 3 },
   { name: "USS Farragut", classId: "LARSON", bias: 0.4, home: "SB1", skill: 3 },
+  { name: "USS Yorktown", classId: "IIA", bias: 0.36, home: "SB1", skill: 3 },
+  { name: "IKS Gr'oth", classId: "KPB13", bias: 0.7, home: "SB2", skill: 4 },
 ];
 
 function clamp(n: number, a: number, b: number) {
@@ -308,6 +316,8 @@ function makeShip(
     goalYaw: yaw,
     goalWarp: 0,
     missNote: 0,
+    crystals: cls.crystals ?? 0,
+    remote: false,
   };
 }
 
@@ -337,10 +347,12 @@ export class TrekSim {
   holeOpen = true;
   private holeLeft = 58;
   onBank: ((ship: Ship) => void) | null = null;
+  /** Fired when a local weapon tags a remote ship. Peer id, damage. */
+  onStrike: ((peerId: string, raw: number) => void) | null = null;
   private edgeNote = 0;
   private noTgt = 0;
 
-  constructor(name: string, classId: string) {
+  constructor(name: string, classId: string, opts?: { bots?: boolean }) {
     const cls = classById(classId);
     const home = BASES.find((b) => b.id === cls.home) ?? BASES[0];
     this.player = makeShip(
@@ -356,7 +368,8 @@ export class TrekSim {
       0,
     );
     this.ships = [this.player];
-    const letters = ["b", "c", "d", "e", "f", "g"];
+    if (opts?.bots !== false) {
+    const letters = ["b", "c", "d", "e", "f", "g", "h", "i"];
     BOTS.forEach((bot, i) => {
       const b = BASES.find((x) => x.id === bot.home) ?? BASES[0];
       const ang = (i / BOTS.length) * Math.PI * 2;
@@ -388,6 +401,7 @@ export class TrekSim {
         ship.yaw = yawTo(ship.x, ship.y, WORLD / 2, WORLD / 2);
       }
     }
+    }
     let s = 77;
     const rnd = () => {
       s = (s * 16807) % 2147483647;
@@ -400,6 +414,9 @@ export class TrekSim {
     if (cls.agonizer) this.say("Agonizers ignore range. Each shot spends one torpedo.", "info");
     else if (cls.regenTorp) this.say("Obliterators regenerate. One returns every two seconds.", "info");
     else if (cls.teleport) this.say("Teleporter phasers shove you clear. Transwarp will not track.", "info");
+    else if (cls.esi) this.say("Expanding-sphere phasers hit every ship in range. A crowd weakens the shot.", "info");
+    else if ((cls.crystals ?? 0) >= 60)
+      this.say("Dilithium soaks hits that punch the shields. Dock to refill the crystals.", "info");
     else this.say("W/S warp · A/D turn · click a ship to lock · Space phasers · T torpedoes · . dock", "info");
   }
 
@@ -422,6 +439,87 @@ export class TrekSim {
   shipById(id: string | null) {
     if (!id) return null;
     return this.ships.find((s) => s.id === id) ?? null;
+  }
+
+  upsertRemote(
+    peerId: string,
+    pose: {
+      name?: string;
+      classId?: string;
+      x?: number;
+      y?: number;
+      yaw?: number;
+      warp?: number;
+      shield?: number;
+      hull?: number;
+      cloaked?: boolean;
+      docked?: boolean;
+      alive?: boolean;
+    },
+  ) {
+    const id = `net:${peerId}`;
+    const alive = pose.alive !== false;
+    let ship = this.ships.find((s) => s.id === id);
+    if (!alive) {
+      if (ship?.alive) {
+        ship.alive = false;
+        ship.hull = 0;
+        this.burst(ship.x, ship.y, 16, true);
+        this.say(`${ship.name} destroyed.`, "alert");
+      }
+      return;
+    }
+    const x = clamp(Number(pose.x) || 0, 80, WORLD - 80);
+    const y = clamp(Number(pose.y) || 0, 80, WORLD - 80);
+    if (!ship) {
+      const letters = "bcdefghij";
+      const used = new Set(this.ships.map((s) => s.letter));
+      const letter = letters.split("").find((ch) => !used.has(ch)) ?? "z";
+      ship = makeShip(
+        {
+          name: String(pose.name ?? "Unknown").slice(0, 18),
+          classId: String(pose.classId ?? "EXCEL"),
+          letter,
+          isPlayer: false,
+          home: "SB1",
+          x,
+          y,
+        },
+        this.t,
+      );
+      ship.id = id;
+      ship.remote = true;
+      this.ships.push(ship);
+      this.say(`${ship.name} entered the quadrant.`, "amber");
+    }
+    ship.remote = true;
+    ship.alive = true;
+    ship.name = String(pose.name ?? ship.name).slice(0, 18);
+    if (pose.classId && pose.classId !== ship.cls.id) ship.cls = classById(String(pose.classId));
+    ship.x = x;
+    ship.y = y;
+    ship.yaw = Number(pose.yaw) || 0;
+    ship.warp = clamp(Number(pose.warp) || 0, 0, 18);
+    ship.shield = clamp(Number(pose.shield) || 0, 0, 100);
+    ship.hull = clamp(Number(pose.hull) || 0, 0, ship.cls.hull);
+    ship.cloaked = Boolean(pose.cloaked);
+    ship.docked = Boolean(pose.docked);
+  }
+
+  dropRemotes(peerIds: string[]) {
+    const keep = new Set(peerIds.map((id) => `net:${id}`));
+    this.ships = this.ships.filter((s) => !s.remote || keep.has(s.id));
+    if (this.player.lockId?.startsWith("net:") && !keep.has(this.player.lockId)) {
+      this.player.lockId = null;
+    }
+  }
+
+  applyIncoming(raw: number, byName: string) {
+    if (!this.player.alive || this.over) return;
+    const dmg = Math.max(0, Math.min(500, raw));
+    const ghost = this.ships.find((s) => s.remote && s.name === byName) ?? null;
+    this.applyDamage(this.player, dmg, ghost);
+    this.say(`${byName} hits for ${Math.round(dmg)}.`, "alert");
   }
 
   visible(observer: Ship, target: Ship) {
@@ -577,6 +675,7 @@ export class TrekSim {
       ship.magazine = ship.cls.magazine;
       ship.drones = ship.cls.drones ?? 0;
       ship.mines = ship.cls.mines ?? 0;
+      ship.crystals = ship.cls.crystals ?? 0;
       ship.raiseLatch = false;
       this.say(
         gained > 0
@@ -698,6 +797,7 @@ export class TrekSim {
   }
 
   private moveShip(ship: Ship, dt: number) {
+    if (ship.remote) return;
     if (!ship.alive || ship.docked) {
       ship.warp = 0;
       return;
@@ -888,7 +988,7 @@ export class TrekSim {
     ship.drones -= 1;
     ship.droneCd = 1.7;
     ship.energy -= 6;
-    const spd = 640;
+    const spd = ship.cls.droneVar ? 420 + Math.random() * 520 : 640;
     this.bolts.push({
       x: ship.x + dirx * 40,
       y: ship.y + diry * 40,
@@ -911,11 +1011,27 @@ export class TrekSim {
 
   private applyDamage(target: Ship, raw: number, attacker: Ship | null) {
     if (!target.alive || target.docked || raw <= 0) return;
+    if (target.remote) {
+      if (attacker && attacker.isPlayer) {
+        attacker.dmgGiven += raw;
+        attacker.pendingDmg += raw;
+        if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * 0.5;
+      }
+      target.hitFlash = 0.18;
+      const peer = target.id.startsWith("net:") ? target.id.slice(4) : "";
+      if (peer && attacker?.isPlayer) this.onStrike?.(peer, raw);
+      return;
+    }
     let left = raw;
     if (target.shield > 0) {
       const pct = Math.min(target.shield, left / target.cls.shieldStr);
       target.shield -= pct;
       left -= pct * target.cls.shieldStr;
+    }
+    if (left > 0 && target.crystals > 0) {
+      const soak = Math.min(target.crystals, left);
+      target.crystals -= soak;
+      left -= soak;
     }
     if (left > 0) target.hull -= left;
     target.dmgTaken += raw;
@@ -999,6 +1115,7 @@ export class TrekSim {
 
     for (const ship of this.ships) {
       if (!ship.alive) {
+        if (ship.remote) continue;
         if (!ship.isPlayer && this.t >= ship.respawn && ship.respawn > 0) {
           const base = this.baseById(ship.home);
           ship.alive = true;
@@ -1014,9 +1131,14 @@ export class TrekSim {
           this.clearAboard(ship);
           ship.drones = ship.cls.drones ?? 0;
           ship.mines = ship.cls.mines ?? 0;
+          ship.crystals = ship.cls.crystals ?? 0;
           ship.born = this.t;
           this.say(`${ship.name} relaunched from ${base.name}.`, "info");
         }
+        continue;
+      }
+      if (ship.remote) {
+        ship.hitFlash = Math.max(0, ship.hitFlash - dt);
         continue;
       }
       ship.phaserCd = Math.max(0, ship.phaserCd - dt);
@@ -1078,6 +1200,7 @@ export class TrekSim {
           ship.magazine = ship.cls.magazine;
           ship.drones = ship.cls.drones ?? 0;
           ship.mines = ship.cls.mines ?? 0;
+          ship.crystals = ship.cls.crystals ?? 0;
           const gained = this.goldAboard(ship);
           this.clearAboard(ship);
           ship.banked += gained;
@@ -1159,7 +1282,7 @@ export class TrekSim {
     }
 
     for (const ship of this.ships) {
-      if (!ship.alive || ship.isPlayer) continue;
+      if (!ship.alive || ship.isPlayer || ship.remote) continue;
       if (ship.docked) continue;
       ship.aiAcc -= dt;
       if (ship.aiAcc <= 0) {
@@ -1214,7 +1337,7 @@ export class TrekSim {
     }
 
     for (const ship of this.ships) {
-      if (!ship.alive || ship.docked || ship.holeCd > 0) continue;
+      if (!ship.alive || ship.docked || ship.holeCd > 0 || ship.remote) continue;
       for (let i = 0; i < HOLES.length; i++) {
         const h = HOLES[i];
         if (this.dist(ship.x, ship.y, h.x, h.y) < 78) {
@@ -1290,7 +1413,7 @@ export class TrekSim {
       g.life -= dt;
       let taken = false;
       for (const ship of seekers) {
-        if (!ship.alive || ship.docked) continue;
+        if (!ship.alive || ship.docked || ship.remote) continue;
         if (this.dist(ship.x, ship.y, g.x, g.y) < 56) {
           ship.cargo += g.gold;
           if (ship.isPlayer) {
@@ -1338,6 +1461,8 @@ export class TrekSim {
     p.courseYaw = null;
     this.clearAboard(p);
     p.drones = p.cls.drones ?? 0;
+    p.mines = p.cls.mines ?? 0;
+    p.crystals = p.cls.crystals ?? 0;
     p.born = this.t;
     p.phaserCd = 0;
     p.torpCd = 0.3;
@@ -1416,6 +1541,8 @@ export class TrekSim {
       dronesMax: p.cls.drones ?? 0,
       mines: p.mines,
       minesMax: p.cls.mines ?? 0,
+      crystals: p.crystals,
+      crystalsMax: p.cls.crystals ?? 0,
       holeOpen: this.holeOpen,
       cloakOn: p.cloaked,
       canCloak: p.cls.cloak,

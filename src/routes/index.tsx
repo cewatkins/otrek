@@ -8,10 +8,19 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const [flight, setFlight] = useState<{ name: string; classId: string; id: number } | null>(null);
+  const [flight, setFlight] = useState<{
+    name: string;
+    classId: string;
+    id: number;
+    room: string | null;
+  } | null>(null);
 
   if (!flight) {
-    return <Shipyard onStart={(name, classId) => setFlight({ name, classId, id: Date.now() })} />;
+    return (
+      <Shipyard
+        onStart={(name, classId, room) => setFlight({ name, classId, id: Date.now(), room })}
+      />
+    );
   }
 
   return (
@@ -19,6 +28,7 @@ function Home() {
       key={flight.id}
       name={flight.name}
       classId={flight.classId}
+      room={flight.room}
       onLeave={() => setFlight(null)}
     />
   );
