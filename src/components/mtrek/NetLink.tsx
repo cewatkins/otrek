@@ -104,9 +104,22 @@ export function NetLink({ room, name, simRef, sendRef }: Props) {
     );
   }, [p2p.joined, p2p.peers, simRef]);
 
+  const handles = [name, ...p2p.peers.map((peer) => peer.name || "unnamed")];
+
   return (
-    <p className="pointer-events-none absolute top-14 left-3 z-10 font-mono text-xs text-amber">
-      ROOM {room} · {label}
-    </p>
+    <div className="pointer-events-none absolute top-14 left-3 z-10 max-w-64 font-mono text-xs">
+      <p className="text-amber">
+        QUADRANT · {handles.length} {handles.length === 1 ? "SHIP" : "SHIPS"}
+      </p>
+      <ul className="mt-1 space-y-0.5 text-fg">
+        {handles.map((handle, i) => (
+          <li key={`${handle}-${i}`} className="truncate">
+            {handle}
+            {i === 0 ? " · you" : ""}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-muted">{label}</p>
+    </div>
   );
 }

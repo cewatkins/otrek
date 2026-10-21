@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CLASSES, SHEETS } from "@/game/classes";
 import { loadCallsign, loadScores, saveCallsign, type ScoreRow } from "@/game/scores";
 
@@ -6,12 +6,19 @@ type Props = {
   onStart: (name: string, classId: string, room: string | null) => void;
 };
 
+const QUADRANT = "ALPHA";
+
+type RoomRow = { code: string; count: number; handles: string[] };
+
 export function Shipyard({ onStart }: Props) {
   const [classId, setClassId] = useState(CLASSES[0].id);
   const [name, setName] = useState("USS Intrepid");
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [real, setReal] = useState(true);
-  const [room, setRoom] = useState("");
+  const [shared, setShared] = useState(false);
+  const [board, setBoard] = useState<RoomRow | null>(null);
+  const nameRef = useRef(name);
+  nameRef.current = name;
   const selected = CLASSES.find((c) => c.id === classId) ?? CLASSES[0];
 
   useEffect(() => {
@@ -19,47 +26,83 @@ export function Shipyard({ onStart }: Props) {
     setName(saved.name);
     if (CLASSES.some((c) => c.id === saved.classId)) setClassId(saved.classId);
     setScores(loadScores());
-    const fromUrl = new URLSearchParams(window.location.search).get("room") ?? "";
-    const clean = fromUrl.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-    if (clean) setRoom(clean);
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("play") === "quadrant" || q.get("room")) setShared(true);
   }, []);
+
+  useEffect(() => {
+    let stop = false;
+    const pull = async () => {
+      try {
+        const res = await fetch("/api/rtc?op=rooms");
+        if (!res.ok) return;
+        const data = (await res.json()) as { rooms?: RoomRow[] };
+        const mine = data.rooms?.find((row) => row.code === QUADRANT) ?? null;
+        if (!stop) setBoard(mine);
+      } catch {
+        /* the board can wait for the next pass */
+      }
+    };
+    void pull();
+    const timer = window.setInterval(() => void pull(), 3000);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shared) return;
+    const peerKey = "otrek-lobby-peer";
+    let peer = sessionStorage.getItem(peerKey) ?? "";
+    if (!/^w-[a-z0-9]{6,16}$/.test(peer)) {
+      peer = `w-${Math.random().toString(36).slice(2, 10)}`;
+      sessionStorage.setItem(peerKey, peer);
+    }
+    const roomId = `otrek-${QUADRANT}`;
+    let stop = false;
+    const beat = () => {
+      if (stop) return;
+      const handle = nameRef.current.trim().slice(0, 18) || "unnamed";
+      const q = new URLSearchParams({ room: roomId, peer, name: handle, since: "1" });
+      void fetch(`/api/rtc?${q}`);
+    };
+    beat();
+    const timer = window.setInterval(beat, 4000);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+      void fetch("/api/rtc", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op: "leave", room: roomId, peer }),
+      });
+    };
+  }, [shared]);
 
   const launch = () => {
     const trimmed = name.trim().slice(0, 18) || "USS Intrepid";
-    const code = room.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
     saveCallsign(trimmed, selected.id);
     const url = new URL(window.location.href);
-    if (code) url.searchParams.set("room", code);
-    else url.searchParams.delete("room");
+    url.searchParams.delete("room");
+    if (shared) url.searchParams.set("play", "quadrant");
+    else url.searchParams.delete("play");
     window.history.replaceState(null, "", url);
-    onStart(trimmed, selected.id, code || null);
-  };
-
-  const copyLink = async () => {
-    const code = room.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-    if (!code) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("room", code);
-    window.history.replaceState(null, "", url);
-    try {
-      await navigator.clipboard.writeText(url.toString());
-    } catch {
-      /* the address bar already holds the room */
-    }
+    onStart(trimmed, selected.id, shared ? QUADRANT : null);
   };
 
   const sheet = SHEETS[selected.id];
 
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-bg text-fg">
-      <header className="shrink-0 border-b border-line px-4 py-4 md:px-8">
-        <p className="font-mono text-xs tracking-widest text-amber">CLASS O · PORT 1701 · QUADRANT ALPHA</p>
-        <h1 className="mt-1 font-sans text-4xl font-semibold tracking-tight">OTrek</h1>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-2xl text-sm leading-relaxed text-muted">
-            A browser port of the real-time starship duel. Damage becomes gold-pressed latinum only
-            after you dock. If the hull goes, unbanked bars go with it.
-          </p>
+      <header className="shrink-0 border-b border-line px-4 py-3 md:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="pl-[0.22em] font-sans text-2xl font-light tracking-[0.22em] text-gold">
+              <span className="text-amber">O</span>TREK
+            </h1>
+            <p className="font-mono text-[10px] tracking-[0.35em] text-muted">O FOR OXY · PORT 1701</p>
+          </div>
           <button
             type="button"
             role="switch"
@@ -77,6 +120,10 @@ export function Shipyard({ onStart }: Props) {
             Show real stats
           </button>
         </div>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+          A browser port of the real-time starship duel. Damage becomes gold-pressed latinum only
+          after you dock. If the hull goes, unbanked bars go with it.
+        </p>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -138,6 +185,26 @@ export function Shipyard({ onStart }: Props) {
             </p>
           </div>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">{selected.blurb}</p>
+
+          <section className="mt-6">
+            <h3 className="font-mono text-xs tracking-widest text-muted">QUADRANT</h3>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              One room, like the original. Solo is you and the computer. The quadrant is every other
+              ship on this board.
+            </p>
+            {!board || board.count === 0 ? (
+              <p className="mt-3 border border-line px-3 py-3 font-mono text-xs text-muted">
+                No ships in the quadrant.
+              </p>
+            ) : (
+              <div className="mt-3 border border-line bg-surface px-3 py-2">
+                <p className="font-mono text-xs text-fg">
+                  {board.count} {board.count === 1 ? "SHIP" : "SHIPS"}
+                </p>
+                <p className="mt-1 text-sm text-muted">{board.handles.join(" · ")}</p>
+              </div>
+            )}
+          </section>
 
           {real ? (
             <section className="mt-6">
@@ -254,7 +321,7 @@ export function Shipyard({ onStart }: Props) {
               </p>
               <p className="mt-2 text-sm leading-relaxed text-muted">
                 JavaTrek (GPL) is Joe Hopkinson and Jay Ashworth’s engine, from Chuck L. Peterson’s 1986
-                game. This board took the next letter: OTrek. Upstream is SourceForge and the rumour/jtrek tree.
+                game. This board took the next letter: OTrek. The O is Oxy. Upstream is SourceForge and the rumour/jtrek tree.
                 The live games are telnet, not this page: mtrek.com 1701, javatrek.org 1764, rbop.net 2000.
                 Steve Scherf kept the 1993 C source. Justin Flude made that build run again (mtrek.site 1993,
                 justinflude.org 1993).
@@ -283,37 +350,28 @@ export function Shipyard({ onStart }: Props) {
       </div>
 
       <footer className="flex shrink-0 flex-col gap-2 border-t border-line px-4 py-3 md:px-8">
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="font-mono text-xs text-muted">ROOM CODE</span>
-            <input
-              value={room}
-              onChange={(e) => setRoom(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
-              maxLength={6}
-              placeholder="Solo if empty"
-              aria-label="Room code"
-              className="mt-1 w-full border border-line bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-amber"
-            />
-          </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs text-muted">PLAY</span>
           <button
             type="button"
-            onClick={() => {
-              const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-              let code = "";
-              for (let i = 0; i < 4; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
-              setRoom(code);
-            }}
-            className="h-11 border border-line px-3 font-mono text-xs"
+            aria-pressed={!shared}
+            onClick={() => setShared(false)}
+            className={`h-11 border px-4 font-mono text-xs ${shared ? "border-line" : "border-amber text-amber"}`}
           >
-            New room
+            Solo
           </button>
-          <button type="button" onClick={() => void copyLink()} className="h-11 border border-line px-3 font-mono text-xs">
-            Copy link
+          <button
+            type="button"
+            aria-pressed={shared}
+            onClick={() => setShared(true)}
+            className={`h-11 border px-4 font-mono text-xs ${shared ? "border-amber text-amber" : "border-line"}`}
+          >
+            Quadrant
           </button>
         </div>
         <p className="font-mono text-xs text-muted">
-          Same code, same site, shared quadrant. Up to eight ships. The handshake stays on this
-          server. The fight goes browser to browser, so a published copy hosts itself.
+          Solo keeps the computer ships. Quadrant is the one shared board, up to eight ships. The
+          fight goes browser to browser.
         </p>
         <div className="flex items-end gap-3">
         <label className="min-w-0 flex-1">

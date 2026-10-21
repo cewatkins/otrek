@@ -24,6 +24,7 @@ const postSchema = z.discriminatedUnion("op", [signalSchema, leaveSchema]);
 
 const PEER_TTL_SECONDS = 30;
 const SIGNAL_TTL_SECONDS = 60;
+const ONLY_ROOM = "otrek-ALPHA";
 
 const globalRef = globalThis as typeof globalThis & {
   __rtcSchemaPromise__?: Promise<void>;
@@ -66,6 +67,7 @@ async function roster(sql: Sql, room: string): Promise<PeerRow[]> {
   const rows = await sql.query<{ peer_id: string; name: string }>(
     `SELECT peer_id, name FROM webrtc_peers
      WHERE room = $1 AND last_seen > now() - make_interval(secs => $2)
+       AND peer_id NOT LIKE 'w-%'
      ORDER BY peer_id LIMIT 32`,
     [room, PEER_TTL_SECONDS],
   );
@@ -100,7 +102,38 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+async function listRooms(sql: Sql): Promise<Response> {
+  await prune(sql);
+  const rows = await sql.query<{ room: string; name: string }>(
+    `SELECT room, name FROM webrtc_peers
+     WHERE last_seen > now() - make_interval(secs => $1)
+       AND room = $2
+     ORDER BY room, name
+     LIMIT 200`,
+    [PEER_TTL_SECONDS, ONLY_ROOM],
+  );
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    const code = row.room.slice("otrek-".length).toUpperCase();
+    if (!code) continue;
+    const handles = map.get(code) ?? [];
+    handles.push(row.name.trim() || "unnamed");
+    map.set(code, handles);
+  }
+  const rooms = [...map.entries()].map(([code, handles]) => ({
+    code,
+    count: handles.length,
+    handles,
+  }));
+  return json({ rooms });
+}
+
 async function handleGet(url: URL): Promise<Response> {
+  if (url.searchParams.get("op") === "rooms") {
+    const sql = await getSql();
+    await ensureSchema(sql);
+    return listRooms(sql);
+  }
   const parsed = z
     .object({
       room: ID,
@@ -116,6 +149,7 @@ async function handleGet(url: URL): Promise<Response> {
     });
   if (!parsed.success) return json({ error: "invalid query" }, 400);
   const { room, peer, name, since } = parsed.data;
+  if (room !== ONLY_ROOM) return json({ error: "one quadrant" }, 400);
 
   const sql = await getSql();
   await ensureSchema(sql);
@@ -154,6 +188,7 @@ async function handlePost(request: Request): Promise<Response> {
   const parsed = postSchema.safeParse(body);
   if (!parsed.success) return json({ error: "invalid request" }, 400);
   const msg = parsed.data;
+  if (msg.room !== ONLY_ROOM) return json({ error: "one quadrant" }, 400);
   const sql = await getSql();
   await ensureSchema(sql);
 

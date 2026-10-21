@@ -44,7 +44,56 @@
   animation: alert-pulse 1.2s ease-in-out infinite;
 }
 
+@keyframes trek-drift {
+  0% {
+    transform: translate3d(-52%, 10px, 0) scale(0.94);
+  }
+  55% {
+    transform: translate3d(-48%, -8px, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(-52%, 10px, 0) scale(0.94);
+  }
+}
+
+@keyframes trek-title-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes trek-flare {
+  from {
+    transform: translateY(-50%) scaleX(0.05);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(-50%) scaleX(1);
+    opacity: 1;
+  }
+}
+
+.trek-drift {
+  animation: trek-drift 16s ease-in-out infinite;
+}
+
+.trek-title-in {
+  animation: trek-title-in 1.6s ease 0.35s both;
+}
+
+.trek-flare {
+  animation: trek-flare 1.4s ease 0.7s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .trek-drift,
+  .trek-title-in,
+  .trek-flare,
   .pulse-alert {
     animation: none;
   }

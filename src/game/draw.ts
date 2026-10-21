@@ -58,6 +58,10 @@ export function radarSplit(h: number) {
   return Math.round(Math.min(Math.max(h * 0.36, 148), h * 0.44));
 }
 
+function gaugeWidth(w: number) {
+  return Math.round(Math.min(220, Math.max(128, w * 0.28)));
+}
+
 export function cameraFor(sim: TrekSim, w: number, h: number): Camera {
   const short = Math.min(w, h);
   const scale = short / 2400;
@@ -111,6 +115,57 @@ function paintShip(
   ctx.restore();
 }
 
+function drawGauges(
+  ctx: CanvasRenderingContext2D,
+  sim: TrekSim,
+  pane: { x: number; y: number; w: number; h: number },
+) {
+  const p = sim.player;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pane.x, pane.y, pane.w, pane.h);
+  ctx.clip();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(pane.x, pane.y, pane.w, pane.h);
+  ctx.fillStyle = MUTED;
+  ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+  ctx.fillText("GAUGES", pane.x + 10, pane.y + 16);
+  const rows = [
+    { label: "SHIELDS", frac: p.shield / 100, text: String(Math.round(p.shield)), color: BLUE },
+    {
+      label: pane.w < 176 ? "TORPEDOES" : "PHOTON TORPEDOES",
+      frac: p.cls.magazine > 0 ? p.magazine / p.cls.magazine : 0,
+      text: String(p.magazine),
+      color: GOLD,
+    },
+    {
+      label: "WARP ENERGY",
+      frac: p.cls.energy > 0 ? p.energy / p.cls.energy : 0,
+      text: String(Math.round(p.energy)),
+      color: "#7ee0ff",
+    },
+  ];
+  const gap = (pane.h - 28) / rows.length;
+  rows.forEach((row, i) => {
+    const y = pane.y + 28 + i * gap;
+    ctx.fillStyle = MUTED;
+    ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";
+    ctx.fillText(row.label, pane.x + 10, y + 12);
+    ctx.fillStyle = FG;
+    ctx.fillText(row.text, pane.x + pane.w - 36, y + 12);
+    const bx = pane.x + 10;
+    const by = y + 18;
+    const bw = pane.w - 20;
+    const bh = Math.max(8, Math.min(14, gap - 28));
+    ctx.strokeStyle = "#1a4a72";
+    ctx.strokeRect(bx, by, bw, bh);
+    const frac = Math.max(0, Math.min(1, row.frac));
+    ctx.fillStyle = row.color;
+    ctx.fillRect(bx + 1, by + 1, Math.max(0, (bw - 2) * frac), bh - 2);
+  });
+  ctx.restore();
+}
+
 export function drawTactical(
   ctx: CanvasRenderingContext2D,
   sim: TrekSim,
@@ -119,18 +174,23 @@ export function drawTactical(
   const { w, h } = cam;
   if (!cam.radarOnly) {
     const split = radarSplit(h);
+    const gauges = gaugeWidth(w);
     ctx.save();
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, w, h);
+    drawGauges(ctx, sim, { x: 0, y: 0, w: gauges, h: split });
+    const radarX = gauges + 1;
+    const radarW = Math.max(1, w - radarX);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, w, split);
+    ctx.rect(radarX, 0, radarW, split);
     ctx.clip();
+    ctx.translate(radarX, 0);
     drawTactical(ctx, sim, {
       x: cam.x,
       y: cam.y,
-      scale: Math.min(w, split) / 2400,
-      w,
+      scale: Math.min(radarW, split) / 2400,
+      w: radarW,
       h: split,
       radarOnly: true,
     });
@@ -140,10 +200,9 @@ export function drawTactical(
     ctx.beginPath();
     ctx.moveTo(0, split + 0.5);
     ctx.lineTo(w, split + 0.5);
+    ctx.moveTo(gauges + 0.5, 0);
+    ctx.lineTo(gauges + 0.5, split);
     ctx.stroke();
-    ctx.fillStyle = MUTED;
-    ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText("RADAR", 10, 16);
     drawForward(ctx, sim, { x: 0, y: split + 1, w, h: Math.max(1, h - split - 1) });
     ctx.restore();
     return;
@@ -370,6 +429,10 @@ export function drawTactical(
   }
   ctx.globalAlpha = 1;
 
+  ctx.fillStyle = MUTED;
+  ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+  ctx.fillText("RADAR", 10, 16);
+
   const hullPct = player.cls.hull > 0 ? player.hull / player.cls.hull : 1;
   if (!cam.radarOnly && hullPct < 0.3 && player.alive) {
     const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.2, w / 2, h / 2, h * 0.7);
@@ -511,7 +574,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
     ctx.fillText(`SB${base.num}`, p.sx + s + 4, p.sy);
   }
 
-  const marks: { id: string; kind: string; name: string; yaw: number; flash: boolean; sx: number; sy: number; size: number; fwd: number }[] = [];
+  const marks: { id: string; kind: string; name: string; yaw: number; flash: boolean; shield: number; sx: number; sy: number; size: number; fwd: number }[] = [];
   for (const ship of sim.ships) {
     if (!ship.alive || ship.isPlayer) continue;
     if (!sim.visible(player, ship)) continue;
@@ -523,6 +586,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
       name: ship.name,
       yaw: ship.yaw - player.yaw,
       flash: ship.hitFlash > 0,
+      shield: ship.shield,
       sx: p.sx,
       sy: p.sy,
       size: p.size,
@@ -531,7 +595,17 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
   }
   marks.sort((a, b) => b.fwd - a.fwd);
   for (const mark of marks) {
+    const fog = Math.max(0.35, Math.min(1, 1100 / mark.fwd));
+    ctx.globalAlpha = fog;
     paintShip(ctx, mark.kind, mark.yaw, mark.sx, mark.sy, mark.size, mark.flash);
+    if (mark.shield > 8) {
+      ctx.strokeStyle = `rgba(62, 197, 255, ${0.2 + mark.shield / 250})`;
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      ctx.ellipse(mark.sx, mark.sy, mark.size * 0.62, mark.size * 0.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
     ctx.strokeStyle = mark.kind === "KEV12" || mark.kind === "KPB13" ? RED : mark.kind === "RBOP" || mark.kind === "WARBIRD" ? "#3dce7a" : BLUE;
     ctx.lineWidth = 1;
     const b = mark.size * 0.55;
@@ -584,15 +658,9 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
   ctx.lineTo(cx, horizon + 26);
   ctx.stroke();
 
-  ctx.fillStyle = BLUE;
-  ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-  ctx.fillText(`SHIELDS  ${Math.round(player.shield)}`, pane.x + 12, pane.y + 20);
-  ctx.fillStyle = GOLD;
-  ctx.fillText(`TORPEDOES  ${player.magazine}`, pane.x + 12, pane.y + 36);
-  ctx.fillStyle = FG;
-  ctx.fillText(`WARP  ${player.warp.toFixed(1)}`, pane.x + 12, pane.y + 52);
   ctx.fillStyle = MUTED;
-  ctx.fillText("FORWARD", pane.x + pane.w - 78, pane.y + 20);
+  ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+  ctx.fillText("FORWARD", pane.x + pane.w - 78, pane.y + 18);
   ctx.restore();
 }
 
@@ -604,11 +672,15 @@ export function pointerCommand(
   sy: number,
 ): { kind: "lock"; id: string } | { kind: "course"; x: number; y: number } {
   const split = radarSplit(h);
+  const gauges = gaugeWidth(w);
   if (sy <= split) {
-    const cam = cameraFor(sim, w, split);
-    const id = pickShipAt(sim, cam, sx, sy);
+    if (sx < gauges) return { kind: "course", x: sim.player.x, y: sim.player.y };
+    const radarW = Math.max(1, w - gauges - 1);
+    const cam = cameraFor(sim, radarW, split);
+    const localX = sx - gauges - 1;
+    const id = pickShipAt(sim, cam, localX, sy);
     if (id) return { kind: "lock", id };
-    const world = screenToWorld(cam, sx, sy);
+    const world = screenToWorld(cam, localX, sy);
     return { kind: "course", x: world.x, y: world.y };
   }
   const pane = { x: 0, y: split + 1, w, h: Math.max(1, h - split - 1) };

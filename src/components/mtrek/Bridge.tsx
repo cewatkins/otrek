@@ -207,7 +207,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-3 py-2 md:px-4">
         <div className="min-w-0">
           <p className="font-mono text-xs tracking-widest text-amber">
-            OTREK · {room ? `ROOM ${room}` : "SOLO QUADRANT"}
+            OTREK · OXY · {room ? "QUADRANT" : "SOLO"}
           </p>
           <p className="truncate font-sans text-sm font-semibold">
             {snap ? `${snap.letter} ${snap.name}` : name}{" "}
