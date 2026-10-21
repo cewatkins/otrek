@@ -5,8 +5,17 @@ export const WORLD = 9000;
 const WARP_SPEED = 78;
 const WARP_ACCEL = 2.5;
 
-export type Base = { id: string; num: number; name: string; race: string; x: number; y: number };
-export type Planet = { name: string; x: number; y: number };
+export type Quad = "A" | "B";
+export type Base = {
+  id: string;
+  num: number;
+  name: string;
+  race: string;
+  x: number;
+  y: number;
+  quad: Quad;
+};
+export type Planet = { name: string; x: number; y: number; quad: Quad; feed: boolean };
 export type Bolt = {
   x: number;
   y: number;
@@ -112,6 +121,8 @@ export type Ship = {
   crystals: number;
   /** Another player's ship. Pose comes from them; this client does not fly it. */
   remote: boolean;
+  /** Alpha is where every ship starts. The wormhole is the door to Beta. */
+  quad: Quad;
 };
 
 export type RosterRow = {
@@ -164,6 +175,7 @@ export type Snapshot = {
   crystals: number;
   crystalsMax: number;
   holeOpen: boolean;
+  quad: "ALPHA" | "BETA";
   cloakOn: boolean;
   canCloak: boolean;
   repair: boolean;
@@ -194,34 +206,106 @@ export type Snapshot = {
   shake: number;
 };
 
-export const BASES: Base[] = [
-  { id: "SB1", num: 1, name: "Terra Dock", race: "Federation", x: 1500, y: 1500 },
-  { id: "SB2", num: 2, name: "Qo'noS Yards", race: "Klingon", x: 7500, y: 1600 },
-  { id: "SB3", num: 3, name: "Romulus Gate", race: "Romulan", x: 1600, y: 7400 },
-  { id: "SB4", num: 4, name: "Orion Freeport", race: "Orion", x: 7400, y: 7300 },
-];
+export const BASES: Base[] = [];
+export const PLANETS: Planet[] = [];
+export const HOLES: { quad: Quad; x: number; y: number }[] = [];
 
-export const PLANETS: Planet[] = [
-  { name: "Vulcan", x: 2700, y: 2300 },
-  { name: "Rigel XII", x: 4700, y: 4500 },
-  { name: "Praxis", x: 6800, y: 2700 },
-];
+function layChart(
+  rows: { id: string; num: number; name: string; race: string; x: number; y: number; dock: boolean; feed: boolean }[],
+  quad: Quad,
+  holeAt: { x: number; y: number } | null,
+) {
+  const minX = Math.min(...rows.map((r) => r.x));
+  const maxX = Math.max(...rows.map((r) => r.x));
+  const minY = Math.min(...rows.map((r) => r.y));
+  const maxY = Math.max(...rows.map((r) => r.y));
+  const span = Math.max(maxX - minX, maxY - minY) || 1;
+  const scale = 7600 / span;
+  const ox = (WORLD - (maxX - minX) * scale) / 2;
+  const oy = (WORLD - (maxY - minY) * scale) / 2;
+  const pt = (x: number, y: number) => ({
+    x: ox + (x - minX) * scale,
+    y: oy + (maxY - y) * scale,
+  });
+  for (const row of rows) {
+    const p = pt(row.x, row.y);
+    if (row.dock) BASES.push({ id: row.id, num: row.num, name: row.name, race: row.race, quad, ...p });
+    else PLANETS.push({ name: row.name, quad, feed: row.feed, ...p });
+  }
+  const mouth = holeAt ?? {
+    x: rows.reduce((s, r) => s + r.x, 0) / rows.length,
+    y: rows.reduce((s, r) => s + r.y, 0) / rows.length,
+  };
+  HOLES.push({ quad, ...pt(mouth.x, mouth.y) });
+}
 
-export const HOLES = [
-  { x: 4500, y: 1500 },
-  { x: 4500, y: 7500 },
-];
+/** Coordinates from the mtrek.com FAQ chart. Alpha is the quadrant every ship starts in. */
+layChart(
+  [
+    { id: "SB1", num: 1, name: "Starbase 1", race: "Starbase", x: -6150, y: -13432, dock: true, feed: false },
+    { id: "SB2", num: 2, name: "Starbase 2", race: "Starbase", x: 7803, y: -10300, dock: true, feed: false },
+    { id: "SB3", num: 3, name: "Starbase 3", race: "Starbase", x: -6000, y: 10020, dock: true, feed: false },
+    { id: "SB4", num: 4, name: "Starbase 4", race: "Starbase", x: -11400, y: 17000, dock: true, feed: false },
+    { id: "SB5", num: 5, name: "Babylon 5", race: "Starbase", x: -18400, y: 20730, dock: true, feed: false },
+    { id: "SB6", num: 6, name: "Starbase 6", race: "Starbase", x: -29600, y: 17000, dock: true, feed: false },
+    { id: "SB7", num: 7, name: "K-7", race: "Starbase", x: 21800, y: 16000, dock: true, feed: false },
+    { id: "SB8", num: 8, name: "Starbase 8", race: "Starbase", x: 28000, y: 5000, dock: true, feed: false },
+    { id: "SB9", num: 9, name: "Starbase 9", race: "Starbase", x: 33900, y: -10500, dock: true, feed: false },
+    { id: "SB10", num: 10, name: "Starbase 10", race: "Starbase", x: 24000, y: -24000, dock: true, feed: false },
+    { id: "EARTH", num: 0, name: "Earth", race: "Federation", x: 2000, y: 2025, dock: true, feed: false },
+    { id: "VULCAN", num: 0, name: "Vulcan", race: "Federation", x: 6053, y: 20747, dock: true, feed: false },
+    { id: "ROM", num: 0, name: "Romulus", race: "Romulan", x: 20100, y: 29200, dock: true, feed: false },
+    { id: "KLIN", num: 0, name: "Klinzhai", race: "Klingon", x: 36030, y: -18080, dock: true, feed: false },
+    { id: "GORN", num: 0, name: "Gorn", race: "Gorn", x: -10000, y: -36020, dock: true, feed: false },
+    { id: "ORION", num: 0, name: "Orion", race: "Orion", x: -39700, y: 16341, dock: true, feed: false },
+    { id: "VEGA", num: 0, name: "Delta Vega", race: "Planet", x: -20320, y: -21344, dock: false, feed: true },
+    { id: "DENEVA", num: 0, name: "Deneva", race: "Planet", x: -21200, y: -23040, dock: false, feed: true },
+    { id: "WRIGLEY", num: 0, name: "Wrigley", race: "Planet", x: 8100, y: -20341, dock: false, feed: true },
+    { id: "RIGEL", num: 0, name: "Rigel XII", race: "Planet", x: -17700, y: -9341, dock: false, feed: true },
+    { id: "ORGANIA", num: 0, name: "Organia", race: "Planet", x: -18000, y: 4000, dock: false, feed: false },
+    { id: "MUTARA", num: 0, name: "Mutara Nebula", race: "Hazard", x: -6003, y: -10300, dock: false, feed: false },
+    { id: "ROCKS", num: 0, name: "Asteroid Field", race: "Hazard", x: -18000, y: -12500, dock: false, feed: false },
+    { id: "THOLIAN", num: 0, name: "Tholean Space", race: "Hazard", x: -40003, y: 6032, dock: false, feed: false },
+  ],
+  "A",
+  { x: 3, y: -7 },
+);
+
+layChart(
+  [
+    { id: "SB11", num: 11, name: "Starbase 11", race: "Starbase", x: 4016, y: 13407, dock: true, feed: false },
+    { id: "SB12", num: 12, name: "Starbase 12", race: "Starbase", x: 26200, y: 9680, dock: true, feed: false },
+    { id: "SB13", num: 13, name: "Starbase 13", race: "Starbase", x: 8150, y: -10940, dock: true, feed: false },
+    { id: "SB14", num: 14, name: "Starbase 14", race: "Starbase", x: 1340, y: -24700, dock: true, feed: false },
+    { id: "SB15", num: 15, name: "Starbase 15", race: "Starbase", x: -5900, y: -12870, dock: true, feed: false },
+    { id: "SB16", num: 16, name: "Starbase 16", race: "Starbase", x: -19792, y: -15170, dock: true, feed: false },
+    { id: "SB17", num: 17, name: "Starbase 17", race: "Starbase", x: -25935, y: 2440, dock: true, feed: false },
+    { id: "SB18", num: 18, name: "Starbase 18", race: "Starbase", x: -18913, y: 11802, dock: true, feed: false },
+    { id: "SB19", num: 19, name: "Starbase 19", race: "Starbase", x: -16402, y: 22795, dock: true, feed: false },
+    { id: "SB20", num: 20, name: "Starbase 20", race: "Starbase", x: 207, y: 26501, dock: true, feed: false },
+    { id: "DANA", num: 0, name: "Dana", race: "Planet", x: 1280, y: 24120, dock: true, feed: false },
+    { id: "MALIBU", num: 0, name: "Malibu Beta 6", race: "Planet", x: -23450, y: 27700, dock: true, feed: false },
+    { id: "ARRAKIS", num: 0, name: "Arrakis", race: "Planet", x: -15350, y: 2440, dock: false, feed: true },
+    { id: "PLEASURE", num: 0, name: "Pleasure Planet", race: "Planet", x: 28620, y: -15180, dock: false, feed: true },
+    { id: "HAWS", num: 0, name: "Hawserion", race: "Planet", x: -19340, y: -18190, dock: false, feed: true },
+    { id: "NEWT", num: 0, name: "Newtonium", race: "Planet", x: 2512, y: 5004, dock: false, feed: false },
+  ],
+  "B",
+  null,
+);
 
 const BOTS: { name: string; classId: string; bias: number; home: string; skill: number }[] = [
-  { name: "IKS Torg", classId: "KEV12", bias: 0.72, home: "SB2", skill: 5 },
-  { name: "IRW Vorel", classId: "RBOP", bias: 0.5, home: "SB3", skill: 4 },
-  { name: "OSS Slammer", classId: "BR5", bias: 0.45, home: "SB4", skill: 4 },
-  { name: "CDS Galor", classId: "CDA180", bias: 0.62, home: "SB4", skill: 3 },
-  { name: "USS Hood", classId: "EXCEL", bias: 0.34, home: "SB1", skill: 3 },
-  { name: "USS Farragut", classId: "LARSON", bias: 0.4, home: "SB1", skill: 3 },
-  { name: "USS Yorktown", classId: "IIA", bias: 0.36, home: "SB1", skill: 3 },
-  { name: "IKS Gr'oth", classId: "KPB13", bias: 0.7, home: "SB2", skill: 4 },
+  { name: "IKS Torg", classId: "KEV12", bias: 0.72, home: "KLIN", skill: 5 },
+  { name: "IRW Vorel", classId: "RBOP", bias: 0.5, home: "ROM", skill: 4 },
+  { name: "OSS Slammer", classId: "BR5", bias: 0.45, home: "ORION", skill: 4 },
+  { name: "CDS Galor", classId: "CDA180", bias: 0.62, home: "SB7", skill: 3 },
+  { name: "USS Hood", classId: "EXCEL", bias: 0.34, home: "EARTH", skill: 3 },
+  { name: "USS Farragut", classId: "LARSON", bias: 0.4, home: "EARTH", skill: 3 },
+  { name: "USS Yorktown", classId: "IIA", bias: 0.36, home: "EARTH", skill: 3 },
+  { name: "IKS Gr'oth", classId: "KPB13", bias: 0.7, home: "KLIN", skill: 4 },
 ];
+
+export const QUADRANT_ROBOTS = BOTS.map((bot) => bot.name);
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -326,6 +410,7 @@ function makeShip(
     missNote: 0,
     crystals: cls.crystals ?? 0,
     remote: false,
+    quad: "A",
   };
 }
 
@@ -403,9 +488,9 @@ export class TrekSim {
       const dx = ship.x - this.player.x;
       const dy = ship.y - this.player.y;
       const d = Math.hypot(dx, dy) || 1;
-      if (d < 2000) {
-        ship.x = clamp(this.player.x + (dx / d) * 2000, 280, WORLD - 280);
-        ship.y = clamp(this.player.y + (dy / d) * 2000, 280, WORLD - 280);
+      if (d < 750) {
+        ship.x = clamp(this.player.x + (dx / d) * 750, 280, WORLD - 280);
+        ship.y = clamp(this.player.y + (dy / d) * 750, 280, WORLD - 280);
         ship.yaw = yawTo(ship.x, ship.y, WORLD / 2, WORLD / 2);
       }
     }
@@ -462,6 +547,7 @@ export class TrekSim {
       hull?: number;
       cloaked?: boolean;
       docked?: boolean;
+      quad?: "A" | "B";
       alive?: boolean;
     },
   ) {
@@ -497,10 +583,12 @@ export class TrekSim {
       );
       ship.id = id;
       ship.remote = true;
+      ship.quad = pose.quad === "B" ? "B" : "A";
       this.ships.push(ship);
       this.say(`${ship.name} entered the quadrant.`, "amber");
     }
     ship.remote = true;
+    ship.quad = pose.quad === "B" ? "B" : "A";
     ship.alive = true;
     ship.name = String(pose.name ?? ship.name).slice(0, 18);
     if (pose.classId && pose.classId !== ship.cls.id) ship.cls = classById(String(pose.classId));
@@ -532,6 +620,8 @@ export class TrekSim {
 
   visible(observer: Ship, target: Ship) {
     if (!target.alive) return false;
+    if (observer.quad === target.quad && target.remote) return true;
+    if (observer.quad !== target.quad) return false;
     const d = this.dist(observer.x, observer.y, target.x, target.y);
     if (d > observer.cls.scan) return false;
     if (target.cloaked && !target.docked && d > 320 && target !== observer) return false;
@@ -699,9 +789,10 @@ export class TrekSim {
   }
 
   private nearestBase(ship: Ship) {
-    let best = BASES[0];
+    const bases = BASES.filter((b) => b.quad === ship.quad);
+    let best = bases[0] ?? BASES[0];
     let bestD = Infinity;
-    for (const b of BASES) {
+    for (const b of bases) {
       const d = this.dist(ship.x, ship.y, b.x, b.y);
       if (d < bestD) {
         bestD = d;
@@ -1198,6 +1289,7 @@ export class TrekSim {
       if (ship.energy < 8) ship.cloaked = false;
       if (!ship.docked) {
         for (const planet of PLANETS) {
+          if (planet.quad !== ship.quad || !planet.feed) continue;
           if (this.dist(ship.x, ship.y, planet.x, planet.y) < 150) {
             ship.energy = Math.min(ship.cls.energy, ship.energy + 7 * dt);
           }
@@ -1354,32 +1446,36 @@ export class TrekSim {
 
     for (const ship of this.ships) {
       if (!ship.alive || ship.docked || ship.holeCd > 0 || ship.remote) continue;
-      for (let i = 0; i < HOLES.length; i++) {
-        const h = HOLES[i];
-        if (this.dist(ship.x, ship.y, h.x, h.y) < 78) {
-          if (ship.cloaked) {
-            if (ship.isPlayer && this.t > this.edgeNote) {
-              this.edgeNote = this.t + 3;
-              this.say("Cloaked ships cannot take the wormhole.", "alert");
-            }
-            continue;
+      const here = HOLES.find((h) => h.quad === ship.quad);
+        if (!here || this.dist(ship.x, ship.y, here.x, here.y) >= 78) continue;
+        if (ship.cloaked) {
+          if (ship.isPlayer && this.t > this.edgeNote) {
+            this.edgeNote = this.t + 3;
+            this.say("Cloaked ships cannot take the wormhole.", "alert");
           }
-          if (!this.holeOpen) {
-            if (ship.isPlayer && this.t > this.edgeNote) {
-              this.edgeNote = this.t + 3;
-              this.say("Wormhole is dark. It opens about once a minute.", "alert");
-            }
-            continue;
-          }
-          const o = HOLES[1 - i];
-          const n = nose(ship.yaw);
-          ship.x = o.x + n.x * 160;
-          ship.y = o.y + n.y * 160;
-          ship.holeCd = 60;
-          if (ship.isPlayer) this.say("Wormhole transit. A minute before this mouth will take you again.", "amber");
-          break;
+          continue;
         }
-      }
+        if (!this.holeOpen) {
+          if (ship.isPlayer && this.t > this.edgeNote) {
+            this.edgeNote = this.t + 3;
+            this.say("Wormhole is dark. It opens about once a minute.", "alert");
+          }
+          continue;
+        }
+        const there = HOLES.find((h) => h.quad !== ship.quad) ?? here;
+        const n = nose(ship.yaw);
+        ship.quad = there.quad;
+        ship.x = there.x + n.x * 160;
+        ship.y = there.y + n.y * 160;
+        ship.holeCd = 60;
+        if (ship.isPlayer) {
+          this.say(
+            ship.quad === "B"
+              ? "Wormhole transit. Beta quadrant. A minute before this mouth will take you again."
+              : "Wormhole transit. Alpha quadrant. A minute before this mouth will take you again.",
+            "amber",
+          );
+        }
     }
 
     for (let i = this.bolts.length - 1; i >= 0; i--) {
@@ -1511,13 +1607,14 @@ export class TrekSim {
       p.lockId = null;
     }
     const roster: RosterRow[] = this.ships.map((s) => {
-      const seen = s.isPlayer || (s.alive && this.visible(p, s));
+      const same = s.quad === p.quad;
+      const seen = s.isPlayer || (s.alive && (s.remote || this.visible(p, s)));
       return {
         id: s.id,
         letter: s.letter,
-        name: s.name,
+        name: s.remote && !same ? `${s.name} · other quadrant` : s.name,
         code: s.cls.code,
-        dist: seen && s.alive ? this.dist(p.x, p.y, s.x, s.y) : null,
+        dist: seen && s.alive && same ? this.dist(p.x, p.y, s.x, s.y) : null,
         alive: s.alive,
         docked: s.docked,
         isPlayer: s.isPlayer,
@@ -1529,6 +1626,7 @@ export class TrekSim {
     const bd = this.dist(p.x, p.y, base.x, base.y);
     let nearPlanet: string | null = null;
     for (const planet of PLANETS) {
+      if (planet.quad !== p.quad) continue;
       if (this.dist(p.x, p.y, planet.x, planet.y) < 150) nearPlanet = planet.name;
     }
     let hint = "Click a contact or empty space.";
@@ -1560,6 +1658,7 @@ export class TrekSim {
       crystals: p.crystals,
       crystalsMax: p.cls.crystals ?? 0,
       holeOpen: this.holeOpen,
+      quad: p.quad === "B" ? "BETA" : "ALPHA",
       cloakOn: p.cloaked,
       canCloak: p.cls.cloak,
       repair: p.repair,

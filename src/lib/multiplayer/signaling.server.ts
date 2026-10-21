@@ -20,7 +20,16 @@ const signalSchema = z.object({
   }),
 });
 const leaveSchema = z.object({ op: z.literal("leave"), room: ID, peer: ID });
-const postSchema = z.discriminatedUnion("op", [signalSchema, leaveSchema]);
+const stateSchema = z.object({
+  op: z.literal("state"),
+  room: ID,
+  peer: ID,
+  name: z.string().max(64).default(""),
+  payload: z.unknown().refine((v) => v !== undefined && JSON.stringify(v).length <= 4_000, {
+    message: "payload too large",
+  }),
+});
+const postSchema = z.discriminatedUnion("op", [signalSchema, leaveSchema, stateSchema]);
 
 const PEER_TTL_SECONDS = 30;
 const SIGNAL_TTL_SECONDS = 60;
@@ -60,18 +69,35 @@ function ensureSchema(sql: Sql): Promise<void> {
     globalRef.__rtcSchemaPromise__ = undefined;
     throw err;
   });
-  return globalRef.__rtcSchemaPromise__;
+  return globalRef.__rtcSchemaPromise__.then(async () => {
+    await sql.query(`ALTER TABLE webrtc_peers ADD COLUMN IF NOT EXISTS state JSONB`);
+  });
 }
 
 async function roster(sql: Sql, room: string): Promise<PeerRow[]> {
-  const rows = await sql.query<{ peer_id: string; name: string }>(
-    `SELECT peer_id, name FROM webrtc_peers
+  const rows = await sql.query<{ peer_id: string; name: string; state: unknown }>(
+    `SELECT peer_id, name, state FROM webrtc_peers
      WHERE room = $1 AND last_seen > now() - make_interval(secs => $2)
        AND peer_id NOT LIKE 'w-%'
      ORDER BY peer_id LIMIT 32`,
     [room, PEER_TTL_SECONDS],
   );
-  return rows.map((r) => ({ id: r.peer_id, name: r.name }));
+  return rows.map((r) => ({ id: r.peer_id, name: r.name, state: r.state ?? null }));
+}
+
+async function humans(sql: Sql, room: string) {
+  const rows = await sql.query<{ peer_id: string; name: string }>(
+    `SELECT peer_id, name FROM webrtc_peers
+     WHERE room = $1 AND last_seen > now() - make_interval(secs => $2)
+     ORDER BY name, peer_id
+     LIMIT 32`,
+    [room, PEER_TTL_SECONDS],
+  );
+  return rows.map((row) => ({
+    id: row.peer_id,
+    name: row.name.trim() || "unnamed",
+    playing: !row.peer_id.startsWith("w-"),
+  }));
 }
 
 async function touchPeer(sql: Sql, room: string, peer: string, name: string) {
@@ -104,27 +130,29 @@ function json(body: unknown, status = 200): Response {
 
 async function listRooms(sql: Sql): Promise<Response> {
   await prune(sql);
-  const rows = await sql.query<{ room: string; name: string }>(
-    `SELECT room, name FROM webrtc_peers
+  const rows = await sql.query<{ peer_id: string; name: string }>(
+    `SELECT peer_id, name FROM webrtc_peers
      WHERE last_seen > now() - make_interval(secs => $1)
        AND room = $2
-     ORDER BY room, name
+     ORDER BY name, peer_id
      LIMIT 200`,
     [PEER_TTL_SECONDS, ONLY_ROOM],
   );
-  const map = new Map<string, string[]>();
-  for (const row of rows) {
-    const code = row.room.slice("otrek-".length).toUpperCase();
-    if (!code) continue;
-    const handles = map.get(code) ?? [];
-    handles.push(row.name.trim() || "unnamed");
-    map.set(code, handles);
-  }
-  const rooms = [...map.entries()].map(([code, handles]) => ({
-    code,
-    count: handles.length,
-    handles,
+  const players = rows.map((row) => ({
+    id: row.peer_id,
+    name: row.name.trim() || "unnamed",
+    playing: !row.peer_id.startsWith("w-"),
   }));
+  const rooms = players.length
+    ? [
+        {
+          code: "ALPHA",
+          count: players.length,
+          handles: players.map((player) => player.name),
+          players,
+        },
+      ]
+    : [];
   return json({ rooms });
 }
 
@@ -168,6 +196,7 @@ async function handleGet(url: URL): Promise<Response> {
   );
   const body: RtcPollResponse = {
     peers: await roster(sql, room),
+    humans: await humans(sql, room),
     signals: rows.map((r) => ({
       id: r.id,
       from: r.from_peer,
@@ -197,6 +226,14 @@ async function handlePost(request: Request): Promise<Response> {
       `INSERT INTO webrtc_signals (room, to_peer, from_peer, kind, payload)
        VALUES ($1, $2, $3, $4, $5)`,
       [msg.room, msg.to, msg.from, msg.kind, JSON.stringify(msg.payload)],
+    );
+  } else if (msg.op === "state") {
+    await sql.query(
+      `INSERT INTO webrtc_peers (room, peer_id, name, last_seen, state)
+       VALUES ($1, $2, $3, now(), $4::jsonb)
+       ON CONFLICT (room, peer_id)
+       DO UPDATE SET last_seen = now(), name = EXCLUDED.name, state = EXCLUDED.state`,
+      [msg.room, msg.peer, msg.name || "unnamed", JSON.stringify(msg.payload)],
     );
   } else {
     await sql.query(`DELETE FROM webrtc_peers WHERE room = $1 AND peer_id = $2`, [

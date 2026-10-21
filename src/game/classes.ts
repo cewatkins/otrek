@@ -52,7 +52,7 @@ export const CLASSES: ShipClass[] = [
     name: "Excelsior",
     code: "EXCEL",
     race: "Federation",
-    home: "SB1",
+    home: "EARTH",
     blurb:
       "Heavy cruiser. Photon tubes that hit harder at long range, thick shields, and a tracking transwarp spike.",
     cruise: 9,
@@ -87,7 +87,7 @@ export const CLASSES: ShipClass[] = [
     name: "Larson",
     code: "LARSON",
     race: "Federation",
-    home: "SB1",
+    home: "EARTH",
     blurb:
       "The 1993 destroyer. Photons, eight drones, and a mine belt. No cloak. The tubes are the ship. Do not miss.",
     cruise: 10,
@@ -122,7 +122,7 @@ export const CLASSES: ShipClass[] = [
     name: "Bird-of-Prey",
     code: "RBOP",
     race: "Romulan",
-    home: "SB3",
+    home: "ROM",
     blurb:
       "Cloak, one plasma tube, and the legs to leave the wreck behind. Fragile if you get caught decloaked.",
     cruise: 12,
@@ -155,7 +155,7 @@ export const CLASSES: ShipClass[] = [
     name: "KEV-12",
     code: "KEV-12",
     race: "Klingon",
-    home: "SB2",
+    home: "KLIN",
     blurb:
       "Obliterators hit the same at any range and grow back, one every two seconds. She cloaks, she carries fifteen drones, and she turns like a moon.",
     cruise: 8,
@@ -189,7 +189,7 @@ export const CLASSES: ShipClass[] = [
     name: "Warbird",
     code: "WARBIRD",
     race: "Romulan",
-    home: "SB3",
+    home: "ROM",
     blurb:
       "Agonizers ignore range and spend a torpedo to fire. Plasma hits harder the farther it flies. Cloak and a mine belt if the range fight goes sour.",
     cruise: 11,
@@ -223,7 +223,7 @@ export const CLASSES: ShipClass[] = [
     name: "Galor",
     code: "CDA-180",
     race: "Cardassian",
-    home: "SB4",
+    home: "SB7",
     blurb:
       "Expanding-sphere phasers scorch every ship in range at once. Crowds make you weaker. Duels make you cruel.",
     cruise: 10,
@@ -257,7 +257,7 @@ export const CLASSES: ShipClass[] = [
     name: "Brigand",
     code: "BR-5",
     race: "Orion",
-    home: "SB4",
+    home: "ORION",
     blurb:
       "Turns like a thief and cloaks like a rumor. Falls apart if a cruiser gets a clean, close phaser lock.",
     cruise: 13,
@@ -290,7 +290,7 @@ export const CLASSES: ShipClass[] = [
     name: "Freighter",
     code: "DY-600",
     race: "Federation",
-    home: "SB1",
+    home: "EARTH",
     blurb:
       "The JavaTrek freighter. Weak phasers that teleport you clear of the target, a thick shield belt, a hold full of drones, and a transwarp spike that does not track.",
     cruise: 8,
@@ -323,7 +323,7 @@ export const CLASSES: ShipClass[] = [
     name: "Constitution II-A",
     code: "II-A",
     race: "Federation",
-    home: "SB1",
+    home: "EARTH",
     blurb:
       "The fast Constitution. Long photons, a mine belt, and a hold of eighty dilithium crystals. The warp core is small. Do not live at damage warp.",
     cruise: 11,
@@ -358,7 +358,7 @@ export const CLASSES: ShipClass[] = [
     name: "K'vort",
     code: "KPB-13",
     race: "Klingon",
-    home: "SB2",
+    home: "KLIN",
     blurb:
       "Battlecruiser. Obliterators grow back, twenty drone racks in the sheet, and no cloak. She wins by staying in the fight.",
     cruise: 10,
@@ -392,7 +392,7 @@ export const CLASSES: ShipClass[] = [
     name: "Gorn Destroyer",
     code: "CV-97",
     race: "Gorn",
-    home: "SB4",
+    home: "GORN",
     blurb:
       "Slow, thick, and cloaked. One plasma tube and a rack of heavy drones. The Gorn does not chase. She arrives.",
     cruise: 9,
@@ -425,7 +425,7 @@ export const CLASSES: ShipClass[] = [
     name: "Hideki",
     code: "CDA-120",
     race: "Cardassian",
-    home: "SB4",
+    home: "SB7",
     blurb:
       "Light escort. Expanding-sphere phasers and variable-speed drones. Fast enough to leave the Galor behind, not tough enough to stay.",
     cruise: 12,

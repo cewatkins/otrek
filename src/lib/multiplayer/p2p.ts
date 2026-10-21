@@ -19,6 +19,8 @@ export type SignalKind = "offer" | "answer" | "ice";
 export interface PeerRow {
   id: string;
   name: string;
+  /** Last posted ship pose, when the relay has one. Absent on older relays. */
+  state?: unknown;
 }
 export interface SignalRow {
   id: number;
@@ -26,9 +28,15 @@ export interface SignalRow {
   kind: SignalKind;
   payload: unknown;
 }
+export interface HumanRow {
+  id: string;
+  name: string;
+  playing: boolean;
+}
 export interface RtcPollResponse {
   peers: PeerRow[];
   signals: SignalRow[];
+  humans?: HumanRow[];
 }
 
 export interface PeerInfo {
@@ -50,6 +58,10 @@ export interface P2PRoomOptions {
   onPeersChanged?: (peers: PeerInfo[]) => void;
   /** Fires for both the unreliable "state" and reliable "reliable" channels. */
   onMessage?: (from: string, data: unknown, channel: "state" | "reliable") => void;
+  /** Every poll, including peers whose direct link has not opened. */
+  onRoster?: (peers: PeerRow[]) => void;
+  /** Everyone logged into the quadrant, including ships still in the yard. */
+  onHumans?: (humans: HumanRow[]) => void;
   /** Fires once, on the first successful signaling poll (registration). */
   onConnected?: () => void;
 }
@@ -146,7 +158,20 @@ export class P2PRoom {
     }).catch(() => {});
   }
 
-  /** Send on the unreliable game-state channel (drops stale packets). */
+  /** Ship pose for peers who cannot open a direct link. The next poll delivers it. */
+  publishState(payload: unknown): void {
+    void fetch("/api/rtc", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        op: "state",
+        room: this.opts.room,
+        peer: this.opts.selfId,
+        name: this.opts.name ?? "",
+        payload,
+      }),
+    }).catch(() => {});
+  }
   broadcast(data: unknown): void {
     const wire = JSON.stringify({ t: "d", d: data });
     for (const slot of this.peers.values()) {
@@ -202,6 +227,8 @@ export class P2PRoom {
       this.opts.onConnected?.();
     }
     this.reconcileRoster(body.peers);
+    this.opts.onRoster?.(body.peers);
+    this.opts.onHumans?.(body.humans ?? []);
     const roster = new Set(body.peers.map((p) => p.id));
     for (const sig of body.signals) {
       this.cursor = Math.max(this.cursor, sig.id);

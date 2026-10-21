@@ -259,7 +259,12 @@ export function drawTactical(
   }
   ctx.setLineDash([]);
 
-  HOLES.forEach((hole, i) => {
+  const quad = player.quad;
+  const bases = BASES.filter((b) => b.quad === quad);
+  const planets = PLANETS.filter((p) => p.quad === quad);
+  const hole = HOLES.find((h) => h.quad === quad);
+
+  if (hole) {
     const p = toScreen(cam, hole.x, hole.y);
     const open = sim.holeOpen;
     ctx.strokeStyle = open ? AMBER : MUTED;
@@ -274,10 +279,11 @@ export function drawTactical(
     ctx.globalAlpha = 1;
     ctx.fillStyle = open ? MUTED : LINE;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(open ? (i === 0 ? "ALPHA MOUTH" : "BETA MOUTH") : "WORMHOLE DARK", p.x + 22, p.y + 4);
-  });
+    const mouth = quad === "A" ? "ALPHA WORMHOLE" : "BETA WORMHOLE";
+    ctx.fillText(open ? mouth : "WORMHOLE DARK", p.x + 22, p.y + 4);
+  }
 
-  for (const planet of PLANETS) {
+  for (const planet of planets) {
     const p = toScreen(cam, planet.x, planet.y);
     ctx.fillStyle = "#221c14";
     ctx.beginPath();
@@ -294,7 +300,7 @@ export function drawTactical(
     ctx.fillText(planet.name, p.x + 28, p.y + 4);
   }
 
-  for (const base of BASES) {
+  for (const base of bases) {
     const p = toScreen(cam, base.x, base.y);
     ctx.strokeStyle = AMBER;
     ctx.lineWidth = 1.5;
@@ -310,7 +316,7 @@ export function drawTactical(
     ctx.stroke();
     ctx.fillStyle = AMBER;
     ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(`SB${base.num} ${base.name}`, p.x + 20, p.y - 8);
+    ctx.fillText(base.num > 0 ? `SB${base.num} ${base.name}` : base.name, p.x + 20, p.y - 8);
     ctx.fillStyle = MUTED;
     ctx.fillText(base.race, p.x + 20, p.y + 8);
   }
@@ -460,13 +466,16 @@ function drawMinimap(ctx: CanvasRenderingContext2D, sim: TrekSim, w: number, h: 
     x: x0 + (wx / WORLD) * size,
     y: y0 + (wy / WORLD) * size,
   });
+  const quad = sim.player.quad;
   ctx.fillStyle = MUTED;
   for (const planet of PLANETS) {
+    if (planet.quad !== quad) continue;
     const p = m(planet.x, planet.y);
     ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
   }
   ctx.fillStyle = AMBER;
   for (const base of BASES) {
+    if (base.quad !== quad) continue;
     const p = m(base.x, base.y);
     ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
   }
@@ -557,6 +566,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
   ctx.stroke();
 
   for (const base of BASES) {
+    if (base.quad !== player.quad) continue;
     const p = project(player, base.x, base.y, pane);
     if (!p || p.fwd > 7000) continue;
     const s = Math.max(10, p.size * 0.35);
@@ -571,7 +581,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
     ctx.stroke();
     ctx.fillStyle = MUTED;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(`SB${base.num}`, p.sx + s + 4, p.sy);
+    ctx.fillText(base.num > 0 ? `SB${base.num}` : base.name, p.sx + s + 4, p.sy);
   }
 
   const marks: { id: string; kind: string; name: string; yaw: number; flash: boolean; shield: number; sx: number; sy: number; size: number; fwd: number }[] = [];

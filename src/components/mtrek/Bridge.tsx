@@ -45,7 +45,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
   pausedRef.current = paused || help;
 
   useEffect(() => {
-    const sim = new TrekSim(name, classId, { bots: !room });
+    const sim = new TrekSim(name, classId);
     simRef.current = sim;
     sim.onBank = (ship) => {
       saveScore({
@@ -197,7 +197,13 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
     const sim = simRef.current;
     if (!sim) return;
     sim.hail(hail);
-    if (hail.trim()) netSend.current?.({ k: "hail", text: `${name}: ${hail.trim().slice(0, 80)}` });
+    if (hail.trim()) {
+      netSend.current?.({
+        k: "hail",
+        text: `${name}: ${hail.trim().slice(0, 80)}`,
+        n: Date.now(),
+      });
+    }
     setHail("");
     setSnap(sim.snapshot());
   };
@@ -207,7 +213,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-3 py-2 md:px-4">
         <div className="min-w-0">
           <p className="font-mono text-xs tracking-widest text-amber">
-            OTREK · OXY · {room ? "QUADRANT" : "SOLO"}
+            OTREK · OXY · {room ? "QUADRANT" : "SOLO"} · {snap?.quad ?? "ALPHA"}
           </p>
           <p className="truncate font-sans text-sm font-semibold">
             {snap ? `${snap.letter} ${snap.name}` : name}{" "}
@@ -261,6 +267,23 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
             className="h-full w-full touch-none"
             aria-label="Tactical display"
           />
+          {snap && snap.messages.length > 0 && (
+            <div className="pointer-events-none absolute top-14 right-3 z-10 max-w-[16rem] space-y-0.5">
+              {snap.messages
+                .slice(0, 5)
+                .reverse()
+                .map((line, i) => (
+                  <p
+                    key={`${i}-${line.text}`}
+                    className={`font-mono text-xs leading-relaxed ${
+                      line.tone === "alert" ? "text-alert" : line.tone === "amber" ? "text-amber" : "text-muted"
+                    }`}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+            </div>
+          )}
           {snap?.docked && (
             <div className="pointer-events-none absolute top-3 left-3 border border-amber bg-bg/90 px-3 py-2 font-mono text-xs text-amber">
               DOCKED · {snap.dockName}
@@ -337,28 +360,29 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
         </button>
       </div>
 
+      <form
+        className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          sendHail();
+        }}
+      >
+        <input
+          value={hail}
+          onChange={(e) => setHail(e.target.value)}
+          placeholder={room ? "Hail the quadrant" : "Hail. Solo — no other players hear this."}
+          aria-label="Hail"
+          className="min-w-0 flex-1 border border-line bg-surface px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-amber"
+        />
+        <button type="submit" className="border border-line px-3 py-1.5 font-mono text-xs">
+          Send
+        </button>
+      </form>
+
       <footer className="hidden shrink-0 items-center gap-3 border-t border-line px-4 py-2 md:flex">
         <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted">
           W/S warp · A/D turn · click lock or course · Space phasers · T torpedoes · G drones · M mines · R shields · C repair · Z cloak · I intercept · . dock · U undock
         </p>
-        <form
-          className="flex"
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendHail();
-          }}
-        >
-          <input
-            value={hail}
-            onChange={(e) => setHail(e.target.value)}
-            placeholder="Hail the quadrant"
-            aria-label="Hail"
-            className="w-56 border border-line bg-surface px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-amber"
-          />
-          <button type="submit" className="border border-l-0 border-line px-3 font-mono text-xs">
-            Send
-          </button>
-        </form>
       </footer>
 
       {(paused || help) && snap?.phase !== "dead" && (

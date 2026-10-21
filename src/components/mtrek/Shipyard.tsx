@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CLASSES, SHEETS } from "@/game/classes";
+import { QUADRANT_ROBOTS } from "@/game/sim";
 import { loadCallsign, loadScores, saveCallsign, type ScoreRow } from "@/game/scores";
 
 type Props = {
@@ -8,17 +9,26 @@ type Props = {
 
 const QUADRANT = "ALPHA";
 
-type RoomRow = { code: string; count: number; handles: string[] };
+type RoomRow = {
+  code: string;
+  count: number;
+  handles: string[];
+  players?: { id: string; name: string; playing: boolean }[];
+};
 
 export function Shipyard({ onStart }: Props) {
   const [classId, setClassId] = useState(CLASSES[0].id);
   const [name, setName] = useState("USS Intrepid");
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [real, setReal] = useState(true);
-  const [shared, setShared] = useState(false);
+  const [shared, setShared] = useState(true);
   const [board, setBoard] = useState<RoomRow | null>(null);
+  const [arrival, setArrival] = useState("");
   const nameRef = useRef(name);
   nameRef.current = name;
+  const selfId = useRef("");
+  const known = useRef(new Set<string>());
+  const seenOnce = useRef(false);
   const selected = CLASSES.find((c) => c.id === classId) ?? CLASSES[0];
 
   useEffect(() => {
@@ -38,13 +48,25 @@ export function Shipyard({ onStart }: Props) {
         if (!res.ok) return;
         const data = (await res.json()) as { rooms?: RoomRow[] };
         const mine = data.rooms?.find((row) => row.code === QUADRANT) ?? null;
-        if (!stop) setBoard(mine);
+        if (stop) return;
+        setBoard(mine);
+        const players = mine?.players ?? [];
+        if (!seenOnce.current) {
+          for (const player of players) known.current.add(player.id);
+          seenOnce.current = true;
+          return;
+        }
+        for (const player of players) {
+          if (player.id === selfId.current || known.current.has(player.id)) continue;
+          known.current.add(player.id);
+          setArrival(player.playing ? `${player.name} is in the quadrant.` : `${player.name} logged in.`);
+        }
       } catch {
         /* the board can wait for the next pass */
       }
     };
     void pull();
-    const timer = window.setInterval(() => void pull(), 3000);
+    const timer = window.setInterval(() => void pull(), 1500);
     return () => {
       stop = true;
       window.clearInterval(timer);
@@ -59,6 +81,7 @@ export function Shipyard({ onStart }: Props) {
       peer = `w-${Math.random().toString(36).slice(2, 10)}`;
       sessionStorage.setItem(peerKey, peer);
     }
+    selfId.current = peer;
     const roomId = `otrek-${QUADRANT}`;
     let stop = false;
     const beat = () => {
@@ -102,6 +125,24 @@ export function Shipyard({ onStart }: Props) {
               <span className="text-amber">O</span>TREK
             </h1>
             <p className="font-mono text-[10px] tracking-[0.35em] text-muted">O FOR OXY · PORT 1701</p>
+          </div>
+          <div className="min-w-[16rem] flex-1 border border-line bg-surface px-3 py-2">
+            <p className="font-mono text-[10px] tracking-widest text-amber">
+              HUMANS · {board?.players?.length ?? 0}
+            </p>
+            {!board?.players?.length ? (
+              <p className="mt-1 font-mono text-xs text-muted">No one else is logged in.</p>
+            ) : (
+              <ul className="mt-1 space-y-0.5 font-mono text-xs">
+                {board.players.map((player) => (
+                  <li key={player.id} className="truncate">
+                    {player.name}
+                    {player.id === selfId.current ? " · you" : player.playing ? " · in the fight" : " · logged in"}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {arrival ? <p className="mt-1 font-mono text-xs text-amber">{arrival}</p> : null}
           </div>
           <button
             type="button"
@@ -189,21 +230,17 @@ export function Shipyard({ onStart }: Props) {
           <section className="mt-6">
             <h3 className="font-mono text-xs tracking-widest text-muted">QUADRANT</h3>
             <p className="mt-1 text-xs leading-relaxed text-muted">
-              One room, like the original. Solo is you and the computer. The quadrant is every other
-              ship on this board.
+              One room, like the original. Everyone starts in Alpha. The wormhole is the door to Beta.
+              These robots fly that board. Solo is you and them. Quadrant adds whoever else is here.
             </p>
-            {!board || board.count === 0 ? (
+            {!board?.players?.length ? (
               <p className="mt-3 border border-line px-3 py-3 font-mono text-xs text-muted">
-                No ships in the quadrant.
+                No other players yet. The robots are already out.
               </p>
             ) : (
-              <div className="mt-3 border border-line bg-surface px-3 py-2">
-                <p className="font-mono text-xs text-fg">
-                  {board.count} {board.count === 1 ? "SHIP" : "SHIPS"}
-                </p>
-                <p className="mt-1 text-sm text-muted">{board.handles.join(" · ")}</p>
-              </div>
+              <p className="mt-3 font-mono text-xs text-amber">{arrival || "The list above is every human on this board."}</p>
             )}
+            <p className="mt-2 text-sm text-muted">{QUADRANT_ROBOTS.join(" · ")}</p>
           </section>
 
           {real ? (
@@ -275,7 +312,7 @@ export function Shipyard({ onStart }: Props) {
             <section className="mt-6 max-w-3xl">
               <h3 className="font-mono text-xs tracking-widest text-muted">THIS QUADRANT</h3>
               <p className="mt-1 text-xs leading-relaxed text-muted">
-                Numbers the patrol actually uses. The map is smaller than a telnet quadrant, so ranges are scaled.
+                Numbers the patrol actually uses. The chart is the old Alpha quadrant, fitted onto this board.
               </p>
               <dl className="mt-3 grid grid-cols-2 gap-px bg-line sm:grid-cols-3">
                 <Cell k="CRUISE" v={String(selected.cruise)} />
@@ -370,8 +407,8 @@ export function Shipyard({ onStart }: Props) {
           </button>
         </div>
         <p className="font-mono text-xs text-muted">
-          Solo keeps the computer ships. Quadrant is the one shared board, up to eight ships. The
-          fight goes browser to browser.
+          Solo is you and the robot ships, not other players. Quadrant is that same board, plus
+          whoever else is here. The fight with them goes browser to browser.
         </p>
         <div className="flex items-end gap-3">
         <label className="min-w-0 flex-1">

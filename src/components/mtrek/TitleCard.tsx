@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { introLive, sfx } from "@/game/audio";
 
 type Props = {
   onEngage: () => void;
@@ -6,17 +7,31 @@ type Props = {
 
 export function TitleCard({ onEngage }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const heard = useRef(false);
+  const [sound, setSound] = useState(false);
+
+  const poke = () => {
+    const already = heard.current && introLive();
+    if (sfx.intro()) {
+      heard.current = true;
+      setSound(true);
+    }
+    return already;
+  };
 
   useEffect(() => {
+    poke();
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat) return;
-      if (event.key === "Enter" || event.key === " " || event.key === "Escape") {
-        event.preventDefault();
-        onEngage();
-      }
+      if (event.key !== "Enter" && event.key !== " " && event.key !== "Escape") return;
+      event.preventDefault();
+      if (poke()) onEngage();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      sfx.stopIntro();
+    };
   }, [onEngage]);
 
   useEffect(() => {
@@ -68,11 +83,12 @@ export function TitleCard({ onEngage }: Props) {
   }, []);
 
   return (
-    <button
-      type="button"
-      onClick={onEngage}
-      className="relative block h-dvh w-full overflow-hidden bg-black text-left"
-      aria-label="OTrek title. Engage to enter the shipyard."
+    <div
+      className="relative h-dvh w-full overflow-hidden bg-black text-left"
+      onPointerDown={(event) => {
+        if ((event.target as HTMLElement).closest("button")) return;
+        poke();
+      }}
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.2)_48%,#000_100%)]" />
@@ -81,7 +97,7 @@ export function TitleCard({ onEngage }: Props) {
         alt=""
         className="trek-drift pointer-events-none absolute top-[1%] left-1/2 max-h-[46vh] w-auto max-w-[96vw] object-contain"
       />
-      <div className="trek-title-in pointer-events-none absolute inset-x-0 bottom-[9%] flex flex-col items-center px-6">
+      <div className="trek-title-in pointer-events-none absolute inset-x-0 bottom-[16%] flex flex-col items-center px-6">
         <p className="font-mono text-[10px] tracking-[0.55em] text-gold/80">THE OPEN QUADRANT</p>
         <h1 className="relative mt-3 pl-[0.28em] font-sans text-[clamp(3.4rem,11vw,7.25rem)] leading-none font-light tracking-[0.28em] text-gold">
           <span className="text-amber">O</span>TREK
@@ -90,8 +106,17 @@ export function TitleCard({ onEngage }: Props) {
         </h1>
         <p className="mt-4 pl-[0.45em] font-mono text-[11px] tracking-[0.45em] text-fg/90">O FOR OXY</p>
         <p className="mt-2 font-mono text-[10px] tracking-[0.32em] text-muted">PORT 1701</p>
-        <p className="pulse-alert mt-8 font-mono text-xs tracking-[0.5em] text-amber">ENGAGE</p>
       </div>
-    </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (poke()) onEngage();
+        }}
+        className="pulse-alert absolute bottom-[7%] left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.5em] text-amber"
+        aria-label={sound ? "Engage. Enter the shipyard." : "Start the title cue."}
+      >
+        {sound ? "ENGAGE" : "CLICK FOR SOUND"}
+      </button>
+    </div>
   );
 }

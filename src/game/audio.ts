@@ -45,7 +45,71 @@ function burst(freq: number, q: number, dur: number, gain: number) {
   src.stop(t + dur + 0.02);
 }
 
+let introTimer: ReturnType<typeof setTimeout> | null = null;
+let introBus: GainNode | null = null;
+let introOn = false;
+
+const PHRASE = [196, 247, 294, 392, 494, 392, 330, 247];
+
+function toneAt(freq: number, when: number, dur: number, type: OscillatorType, gain: number, dest: AudioNode) {
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const amp = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, when);
+  amp.gain.setValueAtTime(0.0001, when);
+  amp.gain.exponentialRampToValueAtTime(gain, when + 0.08);
+  amp.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(amp);
+  amp.connect(dest);
+  osc.start(when);
+  osc.stop(when + dur + 0.05);
+}
+
+function queuePhrase() {
+  if (!ctx || !introBus || !introOn) return;
+  const start = ctx.currentTime + 0.06;
+  const step = 0.62;
+  PHRASE.forEach((freq, i) => {
+    const when = start + i * step;
+    toneAt(freq, when, 0.9, "triangle", 0.045, introBus!);
+    toneAt(freq / 2, when, 1.05, "sine", 0.03, introBus!);
+  });
+  toneAt(98, start, PHRASE.length * step, "sine", 0.02, introBus);
+  introTimer = setTimeout(() => queuePhrase(), PHRASE.length * step * 1000);
+}
+
+export function introLive() {
+  return introOn;
+}
+
 export const sfx = {
+  /** Title cue. Returns false until the browser lets audio run. */
+  intro() {
+    unlockAudio();
+    if (!ctx || ctx.state !== "running") return false;
+    if (introOn) return true;
+    introOn = true;
+    introBus = ctx.createGain();
+    introBus.gain.setValueAtTime(0.0001, ctx.currentTime);
+    introBus.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 0.35);
+    introBus.connect(ctx.destination);
+    queuePhrase();
+    return true;
+  },
+  stopIntro() {
+    introOn = false;
+    if (introTimer) clearTimeout(introTimer);
+    introTimer = null;
+    if (!ctx || !introBus) return;
+    const bus = introBus;
+    introBus = null;
+    const now = ctx.currentTime;
+    bus.gain.cancelScheduledValues(now);
+    bus.gain.setValueAtTime(Math.max(0.0001, bus.gain.value), now);
+    bus.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+    setTimeout(() => bus.disconnect(), 450);
+  },
   phaser() {
     tone(980, 0.16, "sawtooth", 0.045, -720);
     tone(1480, 0.11, "square", 0.018, -1100);
