@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 1980,
+      "bodyTextHash": "0ea212689e0ed23434f5f3ad1fa7ecf25c10a62d2e0d83aa3b5be8389f92bcd4",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/shipyard-toggle.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 1980,
+      "bodyTextHash": "0ea212689e0ed23434f5f3ad1fa7ecf25c10a62d2e0d83aa3b5be8389f92bcd4",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/shipyard-toggle-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/shipyard-toggle.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}

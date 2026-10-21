@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 2023,
+      "bodyTextHash": "ab0c761a69877761406e22ee6d0ed222f916edefc3b334321247d544e14d5236",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [
+        "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\n- Date formatting in a user's locale which doesn't match the server.\n- External changing data without sending a snapshot of it along with the HTML.\n- Invalid HTML tag nesting.\n\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\n\n%s%s https://react.dev/link/hydration-mismatch \n\n  ...\n    <AuthProvider>\n      <OutletImpl>\n        <Suspense fallback={null}>\n          <MatchImpl routeId=\"/\">\n            <MatchView router={{...}} match={{id:\"//\",ssr:true, ...}}>\n              <CatchBoundary getResetKey={function getResetKey} errorComponent={function AppErrorComponent} ...>\n                <MatchInnerImpl match={{id:\"//\",ssr:true, ...}}>\n                  <Lazy>\n                    <Home>\n                      <Shipyard onStart={function onStart}>\n                        <div className=\"flex h-dvh...\">\n                          <header>\n                          <div>\n                          <footer className=\"flex shrin...\">\n                            <label className=\"min-w-0 fl...\">\n                              <span>\n                              <input\n                                value=\"USS Intrepid\"\n                                onChange={function onChange}\n                                onKeyDown={function onKeyDown}\n                                maxLength={18}\n                                aria-label=\"Ship name\"\n                                className=\"mt-1 w-full border border-line bg-surface px-3 py-2 font-mono text-sm text-...\"\n-                               style={{caret-color:\"transparent\"}}\n                              >\n                            ...\n"
+      ],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/shipyard.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 2023,
+      "bodyTextHash": "ab0c761a69877761406e22ee6d0ed222f916edefc3b334321247d544e14d5236",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/shipyard-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/shipyard.json"
+}

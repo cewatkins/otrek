@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0c0a07;
+  --color-surface: #16130e;
+  --color-surface-2: #221c14;
+  --color-fg: #f3e6c8;
+  --color-muted: #9a8460;
+  --color-line: #3a3124;
+  --color-amber: #f0a020;
+  --color-alert: #ff5a3c;
+  --font-sans: "Sora", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius-sm: 0.25rem;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html,
+  body {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    overflow: hidden;
+  }
+}
+
+@keyframes alert-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.pulse-alert {
+  animation: alert-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-alert {
+    animation: none;
+  }
+}

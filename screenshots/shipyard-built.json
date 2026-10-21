@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 2023,
+      "bodyTextHash": "ab0c761a69877761406e22ee6d0ed222f916edefc3b334321247d544e14d5236",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/shipyard-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 2023,
+      "bodyTextHash": "ab0c761a69877761406e22ee6d0ed222f916edefc3b334321247d544e14d5236",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/shipyard-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/shipyard-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
