@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "MTrek";
+const APP_NAME = "OTrek";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -16,7 +16,7 @@ export const Route = createRootRoute({
         content:
           "Real-time starship combat in the browser. Fly a quadrant, fight for gold-pressed latinum, and dock before you die.",
       },
-      { name: "theme-color", content: "#0c0a07" },
+      { name: "theme-color", content: "#000000" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

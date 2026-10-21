@@ -2,7 +2,7 @@ import { o as __toESM } from "../_runtime.mjs";
 import { K as require_react, _ as createFileRoute, b as require_jsx_runtime, d as Scripts, f as HeadContent, g as lazyRouteComponent, h as Outlet, m as createRouter, v as createRootRoute, y as useRouter } from "../_libs/@tanstack/react-router+[...].mjs";
 import { t as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { a as number, c as union, i as literal, l as unknown, n as _enum, o as object, r as discriminatedUnion, s as string, t as number$1 } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-CLD_jUg2.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-pxOlpvhe.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var FALLBACK_MESSAGE = "An unexpected error occurred. Try reloading the page.";
@@ -330,7 +330,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-TU-WuRxk.css";
+var styles_default = "/assets/styles-CHY0JHGZ.css";
 var APP_NAME = "MTrek";
 var Route$2 = createRootRoute({
 	head: () => ({
@@ -347,7 +347,7 @@ var Route$2 = createRootRoute({
 			},
 			{
 				name: "theme-color",
-				content: "#0c0a07"
+				content: "#000000"
 			}
 		],
 		links: [
@@ -384,7 +384,7 @@ var Route$2 = createRootRoute({
 		] })]
 	})
 });
-var $$splitComponentImporter = () => import("./routes-3ix6K6ON.mjs");
+var $$splitComponentImporter = () => import("./routes-Bu67ERgy.mjs");
 var Route$1 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
 /**
 * Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`

@@ -7,7 +7,8 @@ export type ScoreRow = {
   at: number;
 };
 
-const KEY = "mtrek-web-v1";
+const KEY = "otrek-web-v1";
+const OLD_KEY = "mtrek-web-v1";
 
 type SaveShape = {
   version: 1;
@@ -23,7 +24,7 @@ function blank(): SaveShape {
 function read(): SaveShape {
   if (typeof localStorage === "undefined") return blank();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem(OLD_KEY);
     if (!raw) return blank();
     const parsed = JSON.parse(raw) as Partial<SaveShape>;
     if (parsed.version !== 1 || !Array.isArray(parsed.scores)) return blank();

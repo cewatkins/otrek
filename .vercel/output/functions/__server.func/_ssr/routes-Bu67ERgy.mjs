@@ -1,6 +1,6 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { K as require_react, b as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-3ix6K6ON.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-Bu67ERgy.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var ctx = null;
@@ -24,12 +24,38 @@ function tone(freq, dur, type, gain, slide = 0) {
 	osc.start(t);
 	osc.stop(t + dur + .02);
 }
+function burst(freq, q, dur, gain) {
+	if (!ctx || ctx.state !== "running") return;
+	const t = ctx.currentTime;
+	const frames = Math.max(1, Math.floor(ctx.sampleRate * dur));
+	const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+	const data = buffer.getChannelData(0);
+	for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+	const src = ctx.createBufferSource();
+	src.buffer = buffer;
+	const filter = ctx.createBiquadFilter();
+	filter.type = "bandpass";
+	filter.frequency.setValueAtTime(freq, t);
+	filter.Q.value = q;
+	const amp = ctx.createGain();
+	amp.gain.setValueAtTime(gain, t);
+	amp.gain.exponentialRampToValueAtTime(1e-4, t + dur);
+	src.connect(filter);
+	filter.connect(amp);
+	amp.connect(ctx.destination);
+	src.start(t);
+	src.stop(t + dur + .02);
+}
 var sfx = {
 	phaser() {
-		tone(220, .14, "sawtooth", .03, -140);
+		tone(980, .16, "sawtooth", .045, -720);
+		tone(1480, .11, "square", .018, -1100);
+		burst(2200, 4, .1, .05);
 	},
 	torp() {
-		tone(90, .18, "square", .025, -30);
+		tone(160, .32, "sine", .07, -90);
+		tone(70, .38, "triangle", .05, -30);
+		burst(420, 1.2, .22, .06);
 	},
 	hit() {
 		tone(140, .08, "triangle", .03);
@@ -1360,7 +1386,8 @@ var TrekSim = class {
 					x2: o.x,
 					y2: o.y,
 					life: .16,
-					esi: true
+					esi: true,
+					byPlayer: ship.isPlayer
 				});
 			}
 			if (ship.isPlayer || this.visible(this.player, ship)) sfx.phaser();
@@ -1411,7 +1438,8 @@ var TrekSim = class {
 			x2: victim.x,
 			y2: victim.y,
 			life: .14,
-			esi: false
+			esi: false,
+			byPlayer: ship.isPlayer
 		});
 		if (ship.isPlayer || victim.isPlayer) sfx.phaser();
 		return true;
@@ -2033,12 +2061,54 @@ var TrekSim = class {
 		};
 	}
 };
-var BG = "#0c0a07";
-var FG = "#f3e6c8";
-var MUTED = "#9a8460";
-var AMBER = "#f0a020";
-var ALERT = "#ff5a3c";
-var LINE = "#3a3124";
+var BG = "#000000";
+var FG = "#e6eef6";
+var MUTED = "#8b9bb0";
+var AMBER = "#5eb6ff";
+var ALERT = "#ff3358";
+var LINE = "#163044";
+var BLUE = "#3ec5ff";
+var RED = "#ff2438";
+var GOLD = "#e4c36a";
+var SPRITE_SRC = {
+	EXCEL: "/ships/excel.png",
+	LARSON: "/ships/larson.png",
+	IIA: "/ships/iia.png",
+	RBOP: "/ships/rbop.png",
+	WARBIRD: "/ships/warbird.png",
+	KEV12: "/ships/kev12.png",
+	KPB13: "/ships/kpb13.png",
+	CDA180: "/ships/cda180.png",
+	CDA120: "/ships/cda120.png",
+	BR5: "/ships/br5.png",
+	DY600: "/ships/dy600.png",
+	CV97: "/ships/cv97.png"
+};
+var spriteCache = /* @__PURE__ */ new Map();
+function shipSprite(kind) {
+	if (typeof Image === "undefined") return null;
+	const src = SPRITE_SRC[kind];
+	if (!src) return null;
+	let img = spriteCache.get(src);
+	if (!img) {
+		img = new Image();
+		img.decoding = "async";
+		img.src = src;
+		spriteCache.set(src, img);
+	}
+	return img.complete && img.naturalWidth > 0 ? img : null;
+}
+/** Grey Starfleet, dark Klingon, green Romulan. The plates are original renders, not studio stills. */
+function factionFilter(kind) {
+	if (kind === "KEV12" || kind === "KPB13") return "brightness(0.55) saturate(0.65)";
+	if (kind === "RBOP" || kind === "WARBIRD") return "hue-rotate(55deg) saturate(1.35) brightness(0.95)";
+	if (kind === "EXCEL" || kind === "LARSON" || kind === "IIA" || kind === "DY600") return "saturate(0.2) brightness(1.18)";
+	if (kind === "BR5") return "brightness(0.7) saturate(0.8)";
+	return "none";
+}
+function radarSplit(h) {
+	return Math.round(Math.min(Math.max(h * .36, 148), h * .44));
+}
 function cameraFor(sim, w, h) {
 	const scale = Math.min(w, h) / 2400;
 	return {
@@ -2049,85 +2119,80 @@ function cameraFor(sim, w, h) {
 		h
 	};
 }
+function screenToWorld(cam, sx, sy) {
+	return {
+		x: (sx - cam.w / 2) / cam.scale + cam.x,
+		y: (sy - cam.h / 2) / cam.scale + cam.y
+	};
+}
 function toScreen(cam, x, y) {
 	return {
 		x: (x - cam.x) * cam.scale + cam.w / 2,
 		y: (y - cam.y) * cam.scale + cam.h / 2
 	};
 }
-function paintShip(ctx, kind, yaw, x, y, scale) {
+function paintShip(ctx, kind, yaw, x, y, size, flash) {
+	const img = shipSprite(kind);
 	ctx.save();
 	ctx.translate(x, y);
 	ctx.rotate(-yaw);
-	ctx.scale(scale, scale);
-	ctx.beginPath();
-	const fed = () => {
-		ctx.ellipse(0, -2, 7, 9, 0, 0, Math.PI * 2);
-		ctx.rect(-3, 2, 6, 10);
-		ctx.rect(-12, 4, 5, 12);
-		ctx.rect(7, 4, 5, 12);
-	};
-	const bird = () => {
-		ctx.moveTo(0, -16);
-		ctx.lineTo(-16, 8);
-		ctx.lineTo(-6, 4);
-		ctx.lineTo(0, 12);
-		ctx.lineTo(6, 4);
-		ctx.lineTo(16, 8);
+	if (img) {
+		const base = factionFilter(kind);
+		const filter = flash ? `${base === "none" ? "" : base} brightness(2.4)`.trim() : base;
+		if (filter && filter !== "none") ctx.filter = filter;
+		ctx.drawImage(img, -size / 2, -size / 2, size, size);
+		ctx.filter = "none";
+	} else {
+		ctx.strokeStyle = flash ? FG : AMBER;
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.moveTo(0, -size * .45);
+		ctx.lineTo(size * .32, size * .4);
+		ctx.lineTo(0, size * .18);
+		ctx.lineTo(-size * .32, size * .4);
 		ctx.closePath();
-	};
-	const klingon = () => {
-		ctx.moveTo(0, -16);
-		ctx.lineTo(-4, -4);
-		ctx.lineTo(-14, 6);
-		ctx.lineTo(-4, 2);
-		ctx.lineTo(-3, 12);
-		ctx.lineTo(3, 12);
-		ctx.lineTo(4, 2);
-		ctx.lineTo(14, 6);
-		ctx.lineTo(4, -4);
-		ctx.closePath();
-	};
-	const galor = () => {
-		ctx.moveTo(0, -12);
-		ctx.lineTo(-14, 2);
-		ctx.lineTo(-8, 10);
-		ctx.lineTo(0, 4);
-		ctx.lineTo(8, 10);
-		ctx.lineTo(14, 2);
-		ctx.closePath();
-	};
-	const dart = () => {
-		ctx.moveTo(0, -15);
-		ctx.lineTo(-6, 12);
-		ctx.lineTo(0, 7);
-		ctx.lineTo(6, 12);
-		ctx.closePath();
-	};
-	const barge = () => {
-		ctx.rect(-8, -12, 16, 24);
-		ctx.rect(-14, -4, 5, 14);
-		ctx.rect(9, -4, 5, 14);
-	};
-	const gorn = () => {
-		ctx.moveTo(0, -14);
-		ctx.lineTo(-16, 4);
-		ctx.lineTo(-10, 14);
-		ctx.lineTo(10, 14);
-		ctx.lineTo(16, 4);
-		ctx.closePath();
-	};
-	if (kind === "DY600") barge();
-	else if (kind === "RBOP" || kind === "WARBIRD") bird();
-	else if (kind === "KEV12" || kind === "KPB13") klingon();
-	else if (kind === "CDA180" || kind === "CDA120") galor();
-	else if (kind === "BR5" || kind === "BR1000") dart();
-	else if (kind === "CV97") gorn();
-	else fed();
+		ctx.stroke();
+	}
 	ctx.restore();
 }
 function drawTactical(ctx, sim, cam) {
 	const { w, h } = cam;
+	if (!cam.radarOnly) {
+		const split = radarSplit(h);
+		ctx.save();
+		ctx.fillStyle = BG;
+		ctx.fillRect(0, 0, w, h);
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(0, 0, w, split);
+		ctx.clip();
+		drawTactical(ctx, sim, {
+			x: cam.x,
+			y: cam.y,
+			scale: Math.min(w, split) / 2400,
+			w,
+			h: split,
+			radarOnly: true
+		});
+		ctx.restore();
+		ctx.strokeStyle = "#1a4a72";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(0, split + .5);
+		ctx.lineTo(w, split + .5);
+		ctx.stroke();
+		ctx.fillStyle = MUTED;
+		ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+		ctx.fillText("RADAR", 10, 16);
+		drawForward(ctx, sim, {
+			x: 0,
+			y: split + 1,
+			w,
+			h: Math.max(1, h - split - 1)
+		});
+		ctx.restore();
+		return;
+	}
 	const shake = sim.shake;
 	const sx = shake ? (Math.random() - .5) * shake : 0;
 	const sy = shake ? (Math.random() - .5) * shake : 0;
@@ -2234,7 +2299,7 @@ function drawTactical(ctx, sim, cam) {
 		ctx.save();
 		ctx.translate(p.x, p.y);
 		ctx.rotate(sim.t * 2);
-		ctx.strokeStyle = AMBER;
+		ctx.strokeStyle = GOLD;
 		ctx.lineWidth = 1.5;
 		ctx.strokeRect(-5, -5, 10, 10);
 		ctx.restore();
@@ -2253,7 +2318,9 @@ function drawTactical(ctx, sim, cam) {
 	}
 	for (const b of sim.bolts) {
 		const p = toScreen(cam, b.x, b.y);
-		ctx.fillStyle = b.drone ? AMBER : b.kind === "plasma" ? ALERT : b.kind === "obliterator" ? AMBER : FG;
+		const owner = sim.shipById(b.owner);
+		const friendly = Boolean(owner?.isPlayer);
+		ctx.fillStyle = b.drone ? friendly ? BLUE : RED : b.kind === "plasma" ? friendly ? "#7dffa8" : ALERT : friendly ? BLUE : RED;
 		ctx.beginPath();
 		if (b.drone) ctx.rect(p.x - 3, p.y - 3, 6, 6);
 		else ctx.arc(p.x, p.y, b.kind === "plasma" ? 4 : 2.5, 0, Math.PI * 2);
@@ -2262,7 +2329,7 @@ function drawTactical(ctx, sim, cam) {
 	for (const beam of sim.beams) {
 		const a = toScreen(cam, beam.x1, beam.y1);
 		const b = toScreen(cam, beam.x2, beam.y2);
-		ctx.strokeStyle = beam.esi ? ALERT : AMBER;
+		ctx.strokeStyle = beam.byPlayer ? BLUE : RED;
 		ctx.globalAlpha = Math.max(.25, beam.life / .16);
 		ctx.lineWidth = beam.esi ? 2 : 1.5;
 		ctx.beginPath();
@@ -2276,7 +2343,8 @@ function drawTactical(ctx, sim, cam) {
 		if (!(ship.isPlayer || sim.visible(player, ship))) continue;
 		const p = toScreen(cam, ship.x, ship.y);
 		const mine = ship.isPlayer;
-		const color = mine ? AMBER : ALERT;
+		const color = mine ? BLUE : RED;
+		const size = mine ? 46 : 36;
 		ctx.save();
 		ctx.globalAlpha = ship.cloaked ? .45 : 1;
 		if (ship.shield > 2) {
@@ -2284,23 +2352,25 @@ function drawTactical(ctx, sim, cam) {
 			ctx.globalAlpha = (ship.cloaked ? .3 : .7) * (ship.shield / 100);
 			ctx.lineWidth = 1.5;
 			ctx.beginPath();
-			ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+			ctx.arc(p.x, p.y, size * .62, 0, Math.PI * 2);
 			ctx.stroke();
 			ctx.globalAlpha = ship.cloaked ? .45 : 1;
 		}
-		ctx.lineWidth = ship.hitFlash > 0 ? 2.5 : 1.5;
-		ctx.strokeStyle = ship.hitFlash > 0 ? FG : color;
-		ctx.fillStyle = mine ? "#241c12" : "#1a140f";
-		if (ship.docked) ctx.setLineDash([3, 3]);
-		paintShip(ctx, ship.cls.id, ship.yaw, p.x, p.y, mine ? 1.55 : 1.35);
-		ctx.fill();
-		ctx.stroke();
-		ctx.setLineDash([]);
+		if (ship.docked) {
+			ctx.setLineDash([3, 3]);
+			ctx.strokeStyle = color;
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+			ctx.arc(p.x, p.y, size * .72, 0, Math.PI * 2);
+			ctx.stroke();
+			ctx.setLineDash([]);
+		}
+		paintShip(ctx, ship.cls.id, ship.yaw, p.x, p.y, size, ship.hitFlash > 0);
 		ctx.globalAlpha = 1;
-		ctx.fillStyle = mine ? AMBER : FG;
+		ctx.fillStyle = mine ? BLUE : FG;
 		ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
 		const tag = ship.docked ? `${ship.letter} ${ship.name} DOCKED` : `${ship.letter} ${ship.name}`;
-		ctx.fillText(tag, p.x + 16, p.y - 14);
+		ctx.fillText(tag, p.x + size * .55, p.y - 14);
 		ctx.restore();
 	}
 	if (player.lockId) {
@@ -2320,14 +2390,15 @@ function drawTactical(ctx, sim, cam) {
 		ctx.fillRect(p.x, p.y, q.size, q.size);
 	}
 	ctx.globalAlpha = 1;
-	if ((player.cls.hull > 0 ? player.hull / player.cls.hull : 1) < .3 && player.alive) {
+	const hullPct = player.cls.hull > 0 ? player.hull / player.cls.hull : 1;
+	if (!cam.radarOnly && hullPct < .3 && player.alive) {
 		const g = ctx.createRadialGradient(w / 2, h / 2, h * .2, w / 2, h / 2, h * .7);
 		g.addColorStop(0, "rgba(0,0,0,0)");
 		g.addColorStop(1, "rgba(255,90,60,0.28)");
 		ctx.fillStyle = g;
 		ctx.fillRect(0, 0, w, h);
 	}
-	drawMinimap(ctx, sim, w, h);
+	if (!cam.radarOnly) drawMinimap(ctx, sim, w, h);
 	ctx.restore();
 }
 function drawMinimap(ctx, sim, w, h) {
@@ -2364,6 +2435,224 @@ function drawMinimap(ctx, sim, w, h) {
 	ctx.fillStyle = MUTED;
 	ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";
 	ctx.fillText("QUADRANT", x0 + 6, y0 + 14);
+}
+function place(fwd, lat, pane) {
+	if (fwd < 36) return null;
+	const cx = pane.x + pane.w / 2;
+	const horizon = pane.y + pane.h * .36;
+	const focal = pane.h * .92;
+	return {
+		sx: cx + lat / fwd * focal,
+		sy: horizon + Math.min(pane.h * .58, focal * 110 / fwd),
+		size: Math.max(16, Math.min(pane.h * .62, 15e3 / fwd)),
+		fwd
+	};
+}
+function project(player, wx, wy, pane) {
+	const dx = wx - player.x;
+	const dy = wy - player.y;
+	const fx = -Math.sin(player.yaw);
+	const fy = -Math.cos(player.yaw);
+	const rx = Math.cos(player.yaw);
+	const ry = -Math.sin(player.yaw);
+	return place(dx * fx + dy * fy, dx * rx + dy * ry, pane);
+}
+function drawForward(ctx, sim, pane) {
+	const player = sim.player;
+	const cx = pane.x + pane.w / 2;
+	const horizon = pane.y + pane.h * .36;
+	ctx.save();
+	ctx.beginPath();
+	ctx.rect(pane.x, pane.y, pane.w, pane.h);
+	ctx.clip();
+	ctx.fillStyle = "#000000";
+	ctx.fillRect(pane.x, pane.y, pane.w, pane.h);
+	for (let i = 0; i < 80; i++) {
+		let rel = i * 2.399963 % (Math.PI * 2) - player.yaw;
+		while (rel > Math.PI) rel -= Math.PI * 2;
+		while (rel < -Math.PI) rel += Math.PI * 2;
+		if (Math.abs(rel) > 1.2) continue;
+		const sx = cx + rel / 1.2 * pane.w * .48;
+		const sy = pane.y + 12 + i * 53 % Math.max(8, Math.floor(horizon - pane.y - 16));
+		ctx.globalAlpha = .28 + i % 5 * .12;
+		ctx.fillStyle = FG;
+		ctx.fillRect(sx, sy, i % 8 === 0 ? 2 : 1, i % 8 === 0 ? 2 : 1);
+	}
+	ctx.globalAlpha = 1;
+	ctx.strokeStyle = "#12324c";
+	ctx.lineWidth = 1;
+	for (const fwd of [
+		220,
+		420,
+		720,
+		1100,
+		1700,
+		2500,
+		3600
+	]) {
+		const a = place(fwd, -2400, pane);
+		const b = place(fwd, 2400, pane);
+		if (!a || !b) continue;
+		ctx.beginPath();
+		ctx.moveTo(a.sx, a.sy);
+		ctx.lineTo(b.sx, b.sy);
+		ctx.stroke();
+	}
+	for (let lat = -2e3; lat <= 2e3; lat += 500) {
+		const a = place(80, lat, pane);
+		const b = place(4e3, lat, pane);
+		if (!a || !b) continue;
+		ctx.beginPath();
+		ctx.moveTo(a.sx, a.sy);
+		ctx.lineTo(b.sx, b.sy);
+		ctx.stroke();
+	}
+	ctx.strokeStyle = "#1a4a72";
+	ctx.beginPath();
+	ctx.moveTo(pane.x, horizon);
+	ctx.lineTo(pane.x + pane.w, horizon);
+	ctx.stroke();
+	for (const base of BASES) {
+		const p = project(player, base.x, base.y, pane);
+		if (!p || p.fwd > 7e3) continue;
+		const s = Math.max(10, p.size * .35);
+		ctx.strokeStyle = BLUE;
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.moveTo(p.sx, p.sy - s);
+		ctx.lineTo(p.sx + s, p.sy);
+		ctx.lineTo(p.sx, p.sy + s);
+		ctx.lineTo(p.sx - s, p.sy);
+		ctx.closePath();
+		ctx.stroke();
+		ctx.fillStyle = MUTED;
+		ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+		ctx.fillText(`SB${base.num}`, p.sx + s + 4, p.sy);
+	}
+	const marks = [];
+	for (const ship of sim.ships) {
+		if (!ship.alive || ship.isPlayer) continue;
+		if (!sim.visible(player, ship)) continue;
+		const p = project(player, ship.x, ship.y, pane);
+		if (!p || p.sx < pane.x - 120 || p.sx > pane.x + pane.w + 120) continue;
+		marks.push({
+			id: ship.id,
+			kind: ship.cls.id,
+			name: ship.name,
+			yaw: ship.yaw - player.yaw,
+			flash: ship.hitFlash > 0,
+			sx: p.sx,
+			sy: p.sy,
+			size: p.size,
+			fwd: p.fwd
+		});
+	}
+	marks.sort((a, b) => b.fwd - a.fwd);
+	for (const mark of marks) {
+		paintShip(ctx, mark.kind, mark.yaw, mark.sx, mark.sy, mark.size, mark.flash);
+		ctx.strokeStyle = mark.kind === "KEV12" || mark.kind === "KPB13" ? RED : mark.kind === "RBOP" || mark.kind === "WARBIRD" ? "#3dce7a" : BLUE;
+		ctx.lineWidth = 1;
+		const b = mark.size * .55;
+		ctx.strokeRect(mark.sx - b, mark.sy - b, b * 2, b * 2);
+		ctx.fillStyle = FG;
+		ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+		ctx.fillText(mark.name, mark.sx + b + 4, mark.sy - 4);
+	}
+	for (const bolt of sim.bolts) {
+		const p = project(player, bolt.x, bolt.y, pane);
+		if (!p) continue;
+		ctx.fillStyle = sim.shipById(bolt.owner)?.isPlayer ? BLUE : RED;
+		ctx.beginPath();
+		ctx.arc(p.sx, p.sy, bolt.drone ? 4 : bolt.kind === "plasma" ? 5 : 3, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	for (const beam of sim.beams) {
+		const hit = project(player, beam.x2, beam.y2, pane);
+		ctx.strokeStyle = beam.byPlayer ? BLUE : RED;
+		ctx.globalAlpha = Math.max(.4, beam.life / .16);
+		ctx.lineWidth = beam.esi ? 3 : 2;
+		ctx.beginPath();
+		if (beam.byPlayer) {
+			ctx.moveTo(cx, pane.y + pane.h - 8);
+			if (hit) ctx.lineTo(hit.sx, hit.sy);
+			else ctx.lineTo(cx, horizon);
+		} else if (hit) {
+			const src = project(player, beam.x1, beam.y1, pane);
+			if (!src) continue;
+			ctx.moveTo(src.sx, src.sy);
+			ctx.lineTo(hit.sx, hit.sy);
+		}
+		ctx.stroke();
+		ctx.globalAlpha = 1;
+	}
+	ctx.strokeStyle = BLUE;
+	ctx.lineWidth = 1;
+	ctx.beginPath();
+	ctx.moveTo(cx - 10, horizon + 18);
+	ctx.lineTo(cx - 3, horizon + 18);
+	ctx.moveTo(cx + 3, horizon + 18);
+	ctx.lineTo(cx + 10, horizon + 18);
+	ctx.moveTo(cx, horizon + 10);
+	ctx.lineTo(cx, horizon + 15);
+	ctx.moveTo(cx, horizon + 21);
+	ctx.lineTo(cx, horizon + 26);
+	ctx.stroke();
+	ctx.fillStyle = BLUE;
+	ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
+	ctx.fillText(`SHIELDS  ${Math.round(player.shield)}`, pane.x + 12, pane.y + 20);
+	ctx.fillStyle = GOLD;
+	ctx.fillText(`TORPEDOES  ${player.magazine}`, pane.x + 12, pane.y + 36);
+	ctx.fillStyle = FG;
+	ctx.fillText(`WARP  ${player.warp.toFixed(1)}`, pane.x + 12, pane.y + 52);
+	ctx.fillStyle = MUTED;
+	ctx.fillText("FORWARD", pane.x + pane.w - 78, pane.y + 20);
+	ctx.restore();
+}
+function pointerCommand(sim, w, h, sx, sy) {
+	const split = radarSplit(h);
+	if (sy <= split) {
+		const cam = cameraFor(sim, w, split);
+		const id = pickShipAt(sim, cam, sx, sy);
+		if (id) return {
+			kind: "lock",
+			id
+		};
+		const world = screenToWorld(cam, sx, sy);
+		return {
+			kind: "course",
+			x: world.x,
+			y: world.y
+		};
+	}
+	const pane = {
+		x: 0,
+		y: split + 1,
+		w,
+		h: Math.max(1, h - split - 1)
+	};
+	let best = null;
+	let bestD = 36;
+	for (const ship of sim.ships) {
+		if (!ship.alive || ship.isPlayer || !sim.visible(sim.player, ship)) continue;
+		const p = project(sim.player, ship.x, ship.y, pane);
+		if (!p) continue;
+		const d = Math.hypot(p.sx - sx, p.sy - sy);
+		if (d < Math.max(bestD, p.size * .45)) {
+			bestD = d;
+			best = ship.id;
+		}
+	}
+	if (best) return {
+		kind: "lock",
+		id: best
+	};
+	const nx = (sx - w / 2) / (w * .42);
+	const aim = sim.player.yaw - nx * .7;
+	return {
+		kind: "course",
+		x: sim.player.x - Math.sin(aim) * 900,
+		y: sim.player.y - Math.cos(aim) * 900
+	};
 }
 function pickShipAt(sim, cam, sx, sy) {
 	let best = null;
@@ -3090,16 +3379,9 @@ function Bridge({ name, classId, room, onLeave }) {
 		const rect = canvas.getBoundingClientRect();
 		const sx = e.clientX - rect.left;
 		const sy = e.clientY - rect.top;
-		const cam = cameraFor(sim, rect.width, rect.height);
-		const hit = pickShipAt(sim, cam, sx, sy);
-		if (hit) sim.lockShip(hit);
-		else {
-			const world = {
-				x: (sx - rect.width / 2) / cam.scale + cam.x,
-				y: (sy - rect.height / 2) / cam.scale + cam.y
-			};
-			sim.setCourse(world.x, world.y);
-		}
+		const cmd = pointerCommand(sim, rect.width, rect.height, sx, sy);
+		if (cmd.kind === "lock") sim.lockShip(cmd.id);
+		else sim.setCourse(cmd.x, cmd.y);
 	};
 	const hold = (kind, on) => {
 		const sim = simRef.current;
@@ -3162,7 +3444,7 @@ function Bridge({ name, classId, room, onLeave }) {
 								"BANK ",
 								snap ? snap.banked.toLocaleString("en-US") : "0",
 								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-									className: "text-amber",
+									className: "text-gold",
 									children: [" +", snap?.unbanked ?? 0]
 								})
 							]
@@ -3416,7 +3698,7 @@ function Bridge({ name, classId, room, onLeave }) {
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", {
 							className: "mt-4 space-y-1 font-mono text-xs leading-relaxed text-fg",
 							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "W increases warp. S kills it. High warp turns like a brick." }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "The top of the window is the radar. The bottom is the forward view. Click either one to lock a ship. Blue phasers are yours. Red phasers are theirs." }),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "A turns left, D turns right. Click empty space to come about." }),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Click a ship to lock. Locked torpedoes curve in. Unlocked ones fly straight." }),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Phasers need a lock or a target in the forward arc. ESI hits everyone in range. Agonizers are flat and spend a torpedo. G launches a drone. M drops a mine." }),
@@ -3747,27 +4029,34 @@ function Shipyard({ onStart }) {
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex min-h-0 flex-1 flex-col md:flex-row",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "flex shrink-0 gap-2 overflow-x-auto border-b border-line p-3 md:min-h-0 md:w-72 md:shrink-0 md:flex-col md:overflow-y-auto md:border-r md:border-b-0",
+					className: "flex shrink-0 gap-2 overflow-x-auto border-b border-line p-3 md:min-h-0 md:w-80 md:shrink-0 md:flex-col md:overflow-y-auto md:border-r md:border-b-0",
 					children: CLASSES.map((cls) => {
 						const on = cls.id === selected.id;
 						return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 							type: "button",
 							onClick: () => setClassId(cls.id),
-							className: `min-w-40 shrink-0 border px-3 py-3 text-left md:min-w-0 ${on ? "border-amber bg-surface-2" : "border-line bg-surface"}`,
-							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-									className: "block font-mono text-xs text-amber",
-									children: cls.code
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-									className: "mt-1 block font-sans text-sm font-semibold",
-									children: cls.name
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-									className: "mt-0.5 block text-xs text-muted",
-									children: [cls.race, real && SHEETS[cls.id] ? ` · W${SHEETS[cls.id].cruise} · S${SHEETS[cls.id].shield}` : ` · W${cls.maxWarp} · H${cls.hull}`]
-								})
-							]
+							className: `flex min-w-52 shrink-0 items-center gap-3 border px-3 py-3 text-left md:min-w-0 ${on ? "border-amber bg-surface-2" : "border-line bg-surface"}`,
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: `/ships/${cls.id.toLowerCase()}.png`,
+								alt: "",
+								className: "h-16 w-16 shrink-0 object-contain"
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "min-w-0",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "block font-mono text-xs text-amber",
+										children: cls.code
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "mt-1 block font-sans text-sm font-semibold",
+										children: cls.name
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+										className: "mt-0.5 block text-xs text-muted",
+										children: [cls.race, real && SHEETS[cls.id] ? ` · W${SHEETS[cls.id].cruise} · S${SHEETS[cls.id].shield}` : ` · W${cls.maxWarp} · H${cls.hull}`]
+									})
+								]
+							})]
 						}, cls.id);
 					})
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -3775,13 +4064,20 @@ function Shipyard({ onStart }) {
 					children: [
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 							className: "flex flex-wrap items-end justify-between gap-3",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-								className: "font-mono text-xs text-amber",
-								children: selected.race.toUpperCase()
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
-								className: "font-sans text-2xl font-semibold",
-								children: selected.name
-							})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "flex items-end gap-4",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+									src: `/ships/${selected.id.toLowerCase()}.png`,
+									alt: "",
+									className: "h-24 w-24 object-contain"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-mono text-xs text-amber",
+									children: selected.race.toUpperCase()
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+									className: "font-sans text-2xl font-semibold",
+									children: selected.name
+								})] })]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
 								className: "max-w-md text-right font-mono text-xs text-muted",
 								children: [
 									real && sheet ? sheet.home.toUpperCase() : selected.home,
@@ -4063,7 +4359,7 @@ function Shipyard({ onStart }) {
 												})
 											]
 										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-											className: "text-amber",
+											className: "text-gold",
 											children: row.gold.toLocaleString("en-US")
 										})]
 									}, `${row.name}-${row.code}`))

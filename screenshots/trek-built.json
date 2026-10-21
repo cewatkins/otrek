@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 3443,
+      "bodyTextHash": "7d7323fe56049f3d70dfdc4739b08eb06c6b2f4bd2b5f4f6358a24b36a45d2d6",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/trek-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "MTrek",
+      "hasCanvas": false,
+      "bodyTextLen": 3443,
+      "bodyTextHash": "7d7323fe56049f3d70dfdc4739b08eb06c6b2f4bd2b5f4f6358a24b36a45d2d6",
+      "bodyTextPrefix": "PORT 1701 · QUADRANT ALPHA MTrek A browser port of the real-time",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/trek-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/trek-built.json"
+}

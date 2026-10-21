@@ -53,8 +53,8 @@ export function Shipyard({ onStart }: Props) {
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-bg text-fg">
       <header className="shrink-0 border-b border-line px-4 py-4 md:px-8">
-        <p className="font-mono text-xs tracking-widest text-amber">PORT 1701 · QUADRANT ALPHA</p>
-        <h1 className="mt-1 font-sans text-3xl font-semibold tracking-tight">MTrek</h1>
+        <p className="font-mono text-xs tracking-widest text-amber">CLASS O · PORT 1701 · QUADRANT ALPHA</p>
+        <h1 className="mt-1 font-sans text-4xl font-semibold tracking-tight">OTrek</h1>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm leading-relaxed text-muted">
             A browser port of the real-time starship duel. Damage becomes gold-pressed latinum only
@@ -80,7 +80,7 @@ export function Shipyard({ onStart }: Props) {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-line p-3 md:min-h-0 md:w-72 md:shrink-0 md:flex-col md:overflow-y-auto md:border-r md:border-b-0">
+        <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-line p-3 md:min-h-0 md:w-80 md:shrink-0 md:flex-col md:overflow-y-auto md:border-r md:border-b-0">
           {CLASSES.map((cls) => {
             const on = cls.id === selected.id;
             return (
@@ -88,17 +88,24 @@ export function Shipyard({ onStart }: Props) {
                 key={cls.id}
                 type="button"
                 onClick={() => setClassId(cls.id)}
-                className={`min-w-40 shrink-0 border px-3 py-3 text-left md:min-w-0 ${
+                className={`flex min-w-52 shrink-0 items-center gap-3 border px-3 py-3 text-left md:min-w-0 ${
                   on ? "border-amber bg-surface-2" : "border-line bg-surface"
                 }`}
               >
-                <span className="block font-mono text-xs text-amber">{cls.code}</span>
-                <span className="mt-1 block font-sans text-sm font-semibold">{cls.name}</span>
-                <span className="mt-0.5 block text-xs text-muted">
-                  {cls.race}
-                  {real && SHEETS[cls.id]
-                    ? ` · W${SHEETS[cls.id].cruise} · S${SHEETS[cls.id].shield}`
-                    : ` · W${cls.maxWarp} · H${cls.hull}`}
+                <img
+                  src={`/ships/${cls.id.toLowerCase()}.png`}
+                  alt=""
+                  className="h-16 w-16 shrink-0 object-contain"
+                />
+                <span className="min-w-0">
+                  <span className="block font-mono text-xs text-amber">{cls.code}</span>
+                  <span className="mt-1 block font-sans text-sm font-semibold">{cls.name}</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {cls.race}
+                    {real && SHEETS[cls.id]
+                      ? ` · W${SHEETS[cls.id].cruise} · S${SHEETS[cls.id].shield}`
+                      : ` · W${cls.maxWarp} · H${cls.hull}`}
+                  </span>
                 </span>
               </button>
             );
@@ -107,9 +114,16 @@ export function Shipyard({ onStart }: Props) {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-8">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
+            <div className="flex items-end gap-4">
+              <img
+                src={`/ships/${selected.id.toLowerCase()}.png`}
+                alt=""
+                className="h-24 w-24 object-contain"
+              />
+              <div>
               <p className="font-mono text-xs text-amber">{selected.race.toUpperCase()}</p>
               <h2 className="font-sans text-2xl font-semibold">{selected.name}</h2>
+              </div>
             </div>
             <p className="max-w-md text-right font-mono text-xs text-muted">
               {real && sheet ? sheet.home.toUpperCase() : selected.home}
@@ -129,7 +143,7 @@ export function Shipyard({ onStart }: Props) {
             <section className="mt-6">
               <h3 className="font-mono text-xs tracking-widest text-muted">CLASS TABLE</h3>
               <p className="mt-1 text-xs leading-relaxed text-muted">
-                mtrek.com sheet. Warp is turn / cruise / damage. Energy in parentheses is the table maximum.
+                Class table. Warp is turn / cruise / damage. Energy in parentheses is the table maximum.
               </p>
               <div className="mt-3 overflow-x-auto border border-line">
                 <table className="w-full min-w-[720px] border-collapse font-mono text-xs">
@@ -240,9 +254,10 @@ export function Shipyard({ onStart }: Props) {
               </p>
               <p className="mt-2 text-sm leading-relaxed text-muted">
                 JavaTrek (GPL) is Joe Hopkinson and Jay Ashworth’s engine, from Chuck L. Peterson’s 1986
-                MTrek. Upstream is SourceForge and the rumour/jtrek tree. The live games are telnet, not
-                this page: mtrek.com 1701, javatrek.org 1764, rbop.net 2000. Steve Scherf kept the 1993 C
-                source. Justin Flude made that build run again (mtrek.site 1993, justinflude.org 1993).
+                game. This board took the next letter: OTrek. Upstream is SourceForge and the rumour/jtrek tree.
+                The live games are telnet, not this page: mtrek.com 1701, javatrek.org 1764, rbop.net 2000.
+                Steve Scherf kept the 1993 C source. Justin Flude made that build run again (mtrek.site 1993,
+                justinflude.org 1993).
               </p>
             </section>
             <section>
@@ -257,7 +272,7 @@ export function Shipyard({ onStart }: Props) {
                         {row.name}{" "}
                         <span className="text-muted">{row.code}</span>
                       </span>
-                      <span className="text-amber">{row.gold.toLocaleString("en-US")}</span>
+                      <span className="text-gold">{row.gold.toLocaleString("en-US")}</span>
                     </li>
                   ))}
                 </ol>

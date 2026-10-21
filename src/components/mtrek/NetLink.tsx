@@ -10,7 +10,7 @@ type Props = {
 };
 
 export function NetLink({ room, name, simRef, sendRef }: Props) {
-  const p2p = useP2PRoom({ room: `mtrek-${room}`.slice(0, 64), name });
+  const p2p = useP2PRoom({ room: `otrek-${room}`.slice(0, 64), name });
   const [label, setLabel] = useState("linking");
 
   useEffect(() => {

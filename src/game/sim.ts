@@ -24,7 +24,15 @@ export type Bolt = {
   drone?: boolean;
   varPlasma?: boolean;
 };
-export type Beam = { x1: number; y1: number; x2: number; y2: number; life: number; esi: boolean };
+export type Beam = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  life: number;
+  esi: boolean;
+  byPlayer: boolean;
+};
 export type Pickup = { x: number; y: number; gold: number; life: number };
 export type Mine = { x: number; y: number; dmg: number; owner: string; life: number; arm: number };
 export type Particle = {
@@ -848,7 +856,7 @@ export class TrekSim {
         const fall = clamp(1 - d / range, 0, 1);
         const dmg = (ship.cls.phaser / hits.length) * (0.4 + 0.6 * fall);
         this.applyDamage(o, dmg, ship);
-        this.beams.push({ x1: ship.x, y1: ship.y, x2: o.x, y2: o.y, life: 0.16, esi: true });
+        this.beams.push({ x1: ship.x, y1: ship.y, x2: o.x, y2: o.y, life: 0.16, esi: true, byPlayer: ship.isPlayer });
       }
       if (ship.isPlayer || this.visible(this.player, ship)) sfx.phaser();
       return true;
@@ -901,7 +909,15 @@ export class TrekSim {
       ship.y += (dy / len) * 240;
       if (ship.isPlayer) this.say("Teleporter phaser. You are clear of the target.", "amber");
     }
-    this.beams.push({ x1: ship.x, y1: ship.y, x2: victim.x, y2: victim.y, life: 0.14, esi: false });
+    this.beams.push({
+      x1: ship.x,
+      y1: ship.y,
+      x2: victim.x,
+      y2: victim.y,
+      life: 0.14,
+      esi: false,
+      byPlayer: ship.isPlayer,
+    });
     if (ship.isPlayer || victim.isPlayer) sfx.phaser();
     return true;
   }

@@ -20,7 +20,7 @@ export interface P2PRoomHandle {
 
 export function useP2PRoom(options: UseP2PRoomOptions = {}): P2PRoomHandle {
   const [selfId] = useState(() => `p-${Math.random().toString(36).slice(2, 10)}`);
-  const [room] = useState(() => (options.room ?? "mtrek-open").slice(0, 64));
+  const [room] = useState(() => (options.room ?? "otrek-open").slice(0, 64));
   const [name] = useState(() => options.name ?? selfId);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
   const [joined, setJoined] = useState(false);

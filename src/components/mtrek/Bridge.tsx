@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { unlockAudio } from "@/game/audio";
-import { cameraFor, drawTactical, pickShipAt } from "@/game/draw";
+import { cameraFor, drawTactical, pointerCommand } from "@/game/draw";
 import { saveScore } from "@/game/scores";
 import { TrekSim, type Snapshot } from "@/game/sim";
 import { NetLink } from "@/components/mtrek/NetLink";
@@ -166,16 +166,9 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
     const rect = canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
-    const cam = cameraFor(sim, rect.width, rect.height);
-    const hit = pickShipAt(sim, cam, sx, sy);
-    if (hit) sim.lockShip(hit);
-    else {
-      const world = {
-        x: (sx - rect.width / 2) / cam.scale + cam.x,
-        y: (sy - rect.height / 2) / cam.scale + cam.y,
-      };
-      sim.setCourse(world.x, world.y);
-    }
+    const cmd = pointerCommand(sim, rect.width, rect.height, sx, sy);
+    if (cmd.kind === "lock") sim.lockShip(cmd.id);
+    else sim.setCourse(cmd.x, cmd.y);
   };
 
   const hold = (kind: "left" | "right" | "up" | "down" | "phaser" | "torp" | "drone" | "mine", on: boolean) => {
@@ -214,7 +207,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-3 py-2 md:px-4">
         <div className="min-w-0">
           <p className="font-mono text-xs tracking-widest text-amber">
-            MTREK · {room ? `ROOM ${room}` : "SOLO QUADRANT"}
+            OTREK · {room ? `ROOM ${room}` : "SOLO QUADRANT"}
           </p>
           <p className="truncate font-sans text-sm font-semibold">
             {snap ? `${snap.letter} ${snap.name}` : name}{" "}
@@ -224,7 +217,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
         <div className="flex items-center gap-2">
           <p className="hidden font-mono text-xs text-muted sm:block">
             BANK {snap ? snap.banked.toLocaleString("en-US") : "0"}
-            <span className="text-amber"> +{snap?.unbanked ?? 0}</span>
+            <span className="text-gold"> +{snap?.unbanked ?? 0}</span>
           </p>
           <button
             type="button"
@@ -374,7 +367,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
             <p className="font-mono text-xs tracking-widest text-amber">{help ? "COMMANDS" : "PAUSED"}</p>
             <h2 className="mt-1 font-sans text-xl font-semibold">{help ? "How to fight" : snap?.name}</h2>
             <ul className="mt-4 space-y-1 font-mono text-xs leading-relaxed text-fg">
-              <li>W increases warp. S kills it. High warp turns like a brick.</li>
+              <li>The top of the window is the radar. The bottom is the forward view. Click either one to lock a ship. Blue phasers are yours. Red phasers are theirs.</li>
               <li>A turns left, D turns right. Click empty space to come about.</li>
               <li>Click a ship to lock. Locked torpedoes curve in. Unlocked ones fly straight.</li>
               <li>Phasers need a lock or a target in the forward arc. ESI hits everyone in range. Agonizers are flat and spend a torpedo. G launches a drone. M drops a mine.</li>
