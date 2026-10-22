@@ -181,6 +181,9 @@ export type Snapshot = {
   repair: boolean;
   shieldsUp: boolean;
   intercept: boolean;
+  autoLock: boolean;
+  seekBase: boolean;
+  aiPilot: boolean;
   transwarp: boolean;
   twReady: boolean;
   banked: number;
@@ -396,7 +399,7 @@ function makeShip(
     conflicts: 0,
     conflictAt: new Map(),
     respawn: 0,
-    aiAcc: Math.random() * 0.4,
+    aiAcc: Math.random() * 1.6,
     aiState: "patrol",
     patrolX: partial.x,
     patrolY: partial.y,
@@ -446,6 +449,16 @@ export class TrekSim {
   touchTorp = false;
   touchDrone = false;
   touchMine = false;
+  /** Default on. 5 toggles it. Prefers whoever is shooting you, else the nearest ship. */
+  autoLock = true;
+  /** 2 steers to the nearest starbase, docks, and the yard repairs the ship. */
+  seekBase = false;
+  /** 7 flies the human ship with the same brain the robots use. 7 again takes the helm back. */
+  aiPilot = false;
+  /** Click on the long-range chart. The ship flies to this point. */
+  nav: { x: number; y: number } | null = null;
+  private threatId: string | null = null;
+  private threatUntil = 0;
   /** mtrek.com wormholes sit dark for about a minute, then open again. */
   holeOpen = true;
   private holeLeft = 58;
@@ -534,7 +547,7 @@ export class TrekSim {
   /** One keypress. W raises warp. S lowers it, then backs up. */
   nudgeWarp(dir: 1 | -1) {
     const p = this.player;
-    if (!p.alive || p.docked || this.over || p.twLeft > 0) return;
+    if (this.aiPilot || !p.alive || p.docked || this.over || p.twLeft > 0) return;
     p.intercept = false;
     if (dir > 0 && p.energy < 8) {
       if (this.t > this.warpNote) {
@@ -709,10 +722,118 @@ export class TrekSim {
     this.player.intercept = false;
   }
 
+  toggleAutoLock() {
+    this.autoLock = !this.autoLock;
+    this.say(this.autoLock ? "Autolock on." : "Autolock off.", "info");
+  }
+
+  /** Nearest starbase in this quadrant. Dock, and the yard puts the ship back together. */
+  goToBase() {
+    const p = this.player;
+    if (this.over || !p.alive) return;
+    if (p.docked) {
+      this.say(`Already at ${p.dockName}. The yard has you repaired.`, "info");
+      return;
+    }
+    if (this.seekBase) {
+      this.seekBase = false;
+      this.say("Base run cancelled.", "info");
+      return;
+    }
+    if (this.aiPilot) {
+      this.say("AI has the helm. Press 7 to take it back.", "info");
+      return;
+    }
+    const base = this.nearestBase(p);
+    this.seekBase = true;
+    p.intercept = false;
+    p.courseYaw = null;
+    this.say(`Making for ${base.name}. Will dock and repair.`, "amber");
+  }
+
+  toggleAiPilot() {
+    this.aiPilot = !this.aiPilot;
+    if (this.aiPilot) {
+      this.seekBase = false;
+      this.player.intercept = false;
+      this.player.courseYaw = null;
+      if (this.player.docked) this.player.dockTimer = 3.2;
+      this.say("AI helm on. The ship fights like the other captains. Press 7 to take it back.", "amber");
+    } else {
+      this.say("AI helm off. You have the ship.", "info");
+    }
+  }
+
+  private noteThreat(id: string | null) {
+    if (!id || id === this.player.id) return;
+    this.threatId = id;
+    this.threatUntil = this.t + 5;
+  }
+
+  private autoLockStep() {
+    const p = this.player;
+    if (!this.autoLock || this.over || !p.alive || p.docked) return;
+    let pick: Ship | null = null;
+    if (this.threatId && this.t < this.threatUntil) {
+      const t = this.shipById(this.threatId);
+      if (t && t.alive && !t.docked && t !== p && this.visible(p, t)) pick = t;
+    }
+    if (!pick) {
+      for (const bolt of this.bolts) {
+        if (bolt.owner === p.id || bolt.lockId !== p.id) continue;
+        const s = this.shipById(bolt.owner);
+        if (s && s.alive && !s.docked && this.visible(p, s)) {
+          pick = s;
+          break;
+        }
+      }
+    }
+    if (!pick) {
+      let best = Infinity;
+      for (const s of this.ships) {
+        if (s === p || !s.alive || s.docked || !this.visible(p, s)) continue;
+        const d = this.dist(p.x, p.y, s.x, s.y);
+        if (d < best) {
+          best = d;
+          pick = s;
+        }
+      }
+    }
+    if (!pick) {
+      if (p.lockId) p.lockId = null;
+      return;
+    }
+    if (p.lockId === pick.id) return;
+    const cur = this.shipById(p.lockId);
+    const threat = pick.id === this.threatId && this.t < this.threatUntil;
+    const aimed = this.bolts.some((b) => b.owner === pick.id && b.lockId === p.id);
+    if (cur && cur.alive && !cur.docked && this.visible(p, cur) && !threat && !aimed) {
+      const cd = this.dist(p.x, p.y, cur.x, cur.y);
+      const pd = this.dist(p.x, p.y, pick.x, pick.y);
+      if (pd > cd * 0.85) return;
+    }
+    p.lockId = pick.id;
+    this.say(`Autolock ${pick.letter}:${pick.name}.`, "info");
+  }
+
   setCourse(x: number, y: number) {
     if (this.over || this.player.docked) return;
+    this.nav = null;
     this.player.courseYaw = yawTo(this.player.x, this.player.y, x, y);
     this.player.intercept = false;
+    this.seekBase = false;
+  }
+
+  /** Fly to a point chosen on the long-range chart. */
+  setWaypoint(x: number, y: number) {
+    if (this.over || this.player.docked || !this.player.alive) return;
+    this.nav = { x: clamp(x, 80, WORLD - 80), y: clamp(y, 80, WORLD - 80) };
+    this.player.courseYaw = null;
+    this.player.intercept = false;
+    this.seekBase = false;
+    if (this.aiPilot) this.aiPilot = false;
+    const bearing = String(headingOf(yawTo(this.player.x, this.player.y, this.nav.x, this.nav.y))).padStart(3, "0");
+    this.say(`Long-range course ${bearing}.`, "amber");
   }
 
   toggleRepair() {
@@ -826,6 +947,9 @@ export class TrekSim {
     ship.warp = 0;
     ship.cloaked = false;
     ship.intercept = false;
+    ship.courseYaw = null;
+    if (ship.isPlayer) this.seekBase = false;
+    if (ship.isPlayer && this.aiPilot) ship.dockTimer = 3.2;
     if (ship.isPlayer) {
       const gained = this.goldAboard(ship);
       const bonus = Math.floor(ship.pendingBonus / 10);
@@ -879,6 +1003,32 @@ export class TrekSim {
     return best;
   }
 
+  private flyComputer(ship: Ship, dt: number) {
+    if (!ship.alive || ship.remote || ship.docked) return;
+    ship.aiAcc -= dt;
+    if (ship.aiAcc <= 0) {
+      ship.aiAcc = 1.28;
+      this.think(ship);
+    }
+    this.steerToward(ship, ship.goalYaw, dt * 0.25);
+    this.easeWarp(ship, ship.goalWarp, dt * 0.25);
+    if (ship.aiState === "hunt") {
+      const tgt = this.shipById(ship.lockId);
+      if (tgt && tgt.alive && tgt !== ship && !tgt.docked) {
+        const d = this.dist(ship.x, ship.y, tgt.x, tgt.y);
+        const noseOn = Math.abs(angDiff(ship.yaw, yawTo(ship.x, ship.y, tgt.x, tgt.y))) < 0.55;
+        if (noseOn && d < ship.cls.phaserRange * 0.96) this.firePhaser(ship);
+        if (noseOn && d > ship.cls.torpMin * 0.85 && d < ship.cls.torpMax * 0.95) this.fireTorp(ship);
+        if (d > 200 && d < 1500 && ship.drones > 0) this.fireDrone(ship);
+        if (d > 160 && d < 420 && ship.mines > 0) this.dropMine(ship);
+      }
+    }
+    if (ship.aiState === "docking") {
+      const base = this.nearestBase(ship);
+      if (this.dist(ship.x, ship.y, base.x, base.y) < 96 && ship.warp < 1.6) this.doDock(ship, base);
+    }
+  }
+
   private think(ship: Ship) {
     if (this.t < 8) {
       ship.aiState = "patrol";
@@ -908,13 +1058,42 @@ export class TrekSim {
       return;
     }
     let target = this.nearestShip(ship, foes);
-    if (
+    let shooter: Ship | null = null;
+    let shooterD = Infinity;
+    for (const o of foes) {
+      const shooting =
+        o.lockId === ship.id || this.bolts.some((b) => b.owner === o.id && b.lockId === ship.id);
+      if (!shooting) continue;
+      const d = this.dist(ship.x, ship.y, o.x, o.y);
+      if (d < shooterD) {
+        shooter = o;
+        shooterD = d;
+      }
+    }
+    if (shooter) target = shooter;
+    else if (
+      ship !== this.player &&
       this.player.alive &&
       !this.player.docked &&
       this.visible(ship, this.player) &&
-      Math.random() < ship.bias
+      Math.random() < ship.bias * 0.35
     ) {
-      target = this.player;
+      const playerDist = this.dist(ship.x, ship.y, this.player.x, this.player.y);
+      const nearDist = target ? this.dist(ship.x, ship.y, target.x, target.y) : Infinity;
+      if (playerDist < nearDist * 1.35) target = this.player;
+    }
+    const heldLock = this.shipById(ship.lockId);
+    if (
+      !shooter &&
+      heldLock &&
+      heldLock !== ship &&
+      heldLock.alive &&
+      !heldLock.docked &&
+      this.visible(ship, heldLock)
+    ) {
+      const heldDist = this.dist(ship.x, ship.y, heldLock.x, heldLock.y);
+      const nextDist = target ? this.dist(ship.x, ship.y, target.x, target.y) : Infinity;
+      if (heldDist < nextDist * 1.4) target = heldLock;
     }
     if (!target) {
       ship.aiState = "patrol";
@@ -931,12 +1110,13 @@ export class TrekSim {
     ship.aiState = "hunt";
     ship.lockId = target.id;
     const d = this.dist(ship.x, ship.y, target.x, target.y);
+    const bearing = yawTo(ship.x, ship.y, target.x, target.y);
     const optimal = ship.cls.phaserRange * 0.72;
-    let offset = ship.orbitSign * 0.85;
-    if (d > optimal * 1.45) offset *= 0.15;
-    if (d < optimal * 0.5) offset = ship.orbitSign * 2.4;
-    ship.goalYaw = yawTo(ship.x, ship.y, target.x, target.y) + offset;
-    ship.goalYaw += (Math.random() - 0.5) * (5 - ship.skill) * 0.4;
+    let offset = 0;
+    if (d < optimal) offset = ship.orbitSign * 0.28;
+    if (d < optimal * 0.45) offset = ship.orbitSign * 0.45;
+    ship.goalYaw = bearing + offset;
+    ship.goalYaw += (Math.random() - 0.5) * (5 - ship.skill) * 0.05;
     if (d > ship.cls.torpMax) ship.goalWarp = ship.cls.cruise;
     else if (d > optimal) ship.goalWarp = 4.5;
     else ship.goalWarp = 2.4;
@@ -1212,6 +1392,7 @@ export class TrekSim {
     target.dmgTaken += raw;
     target.hitFlash = 0.18;
     if (attacker && attacker !== target) {
+      if (target.isPlayer) this.noteThreat(attacker.id);
       attacker.dmgGiven += raw;
       attacker.pendingDmg += raw;
       if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * 0.5;
@@ -1337,7 +1518,7 @@ export class TrekSim {
         if (ship.twLeft <= 0) ship.warp = Math.min(ship.warp, ship.cls.cruise);
       }
       const raising =
-        ship.isPlayer
+        ship.isPlayer && !this.aiPilot
           ? (ship.raiseLatch || (held.has("KeyR") && !shift)) && ship.shieldDrop <= 0
           : ship.shield < 100 && ship.energy > 20 && !ship.docked;
       if (ship.shieldDrop > 0) {
@@ -1366,7 +1547,7 @@ export class TrekSim {
       if (ship.energy <= 0 && ship.twLeft <= 0) {
         ship.warp = Math.max(0, ship.warp - WARP_ACCEL * dt);
       }
-      if (ship.docked && !ship.isPlayer) {
+      if (ship.docked && (!ship.isPlayer || this.aiPilot)) {
         ship.dockTimer -= dt;
         if (ship.dockTimer <= 0) {
           ship.docked = false;
@@ -1385,6 +1566,10 @@ export class TrekSim {
     }
 
     const p = this.player;
+    if (this.aiPilot) {
+      this.flyComputer(p, dt);
+    } else {
+    this.autoLockStep();
     if (p.alive && !p.docked && !this.over) {
       let steer = 0;
       if (held.has("KeyA") || held.has("ArrowLeft")) steer += 1;
@@ -1396,7 +1581,11 @@ export class TrekSim {
         held.has("KeyS") ||
         held.has("ArrowDown") ||
         ((held.has("KeyW") || held.has("ArrowUp")) && shift);
-      if (warpUp || warpDn) p.intercept = false;
+      if (warpUp || warpDn) {
+        p.intercept = false;
+        this.seekBase = false;
+        this.nav = null;
+      }
       if (p.twLeft > 0 && p.cls.teleport) {
         p.intercept = false;
         p.courseYaw = null;
@@ -1406,6 +1595,8 @@ export class TrekSim {
         p.yaw += steer * this.turnRate(p) * dt;
         p.intercept = false;
         p.courseYaw = null;
+        this.seekBase = false;
+        this.nav = null;
       } else if (p.intercept && p.lockId) {
         const lock = this.shipById(p.lockId);
         if (lock && lock.alive && this.visible(p, lock)) {
@@ -1415,6 +1606,25 @@ export class TrekSim {
           this.easeWarp(p, want, dt);
         } else {
           p.intercept = false;
+        }
+      } else if (this.seekBase && p.twLeft <= 0) {
+        const base = this.nearestBase(p);
+        const d = this.dist(p.x, p.y, base.x, base.y);
+        this.steerToward(p, yawTo(p.x, p.y, base.x, base.y), dt);
+        const want = d > 900 ? p.cls.cruise : d > 220 ? 3.2 : 0.7;
+        this.easeWarp(p, want, dt);
+        if (d < 100 && p.warp <= 1.4) {
+          this.seekBase = false;
+          this.doDock(p, base);
+        }
+      } else if (this.nav && p.twLeft <= 0) {
+        const d = this.dist(p.x, p.y, this.nav.x, this.nav.y);
+        this.steerToward(p, yawTo(p.x, p.y, this.nav.x, this.nav.y), dt);
+        const want = d > 800 ? p.cls.cruise : d > 240 ? 3 : 0.5;
+        this.easeWarp(p, want, dt);
+        if (d < 90) {
+          this.nav = null;
+          this.say("On station.", "info");
         }
       } else if (p.courseYaw !== null) {
         this.steerToward(p, p.courseYaw, dt);
@@ -1459,31 +1669,11 @@ export class TrekSim {
         } else this.dropMine(p);
       }
     }
+    }
 
     for (const ship of this.ships) {
-      if (!ship.alive || ship.isPlayer || ship.remote) continue;
-      if (ship.docked) continue;
-      ship.aiAcc -= dt;
-      if (ship.aiAcc <= 0) {
-        ship.aiAcc = 0.32;
-        this.think(ship);
-      }
-      this.steerToward(ship, ship.goalYaw, dt);
-      this.easeWarp(ship, ship.goalWarp, dt);
-      if (ship.aiState === "hunt") {
-        const tgt = this.shipById(ship.lockId);
-        if (tgt && tgt.alive) {
-          const d = this.dist(ship.x, ship.y, tgt.x, tgt.y);
-          if (d < ship.cls.phaserRange * 0.96) this.firePhaser(ship);
-          if (d > ship.cls.torpMin * 0.85 && d < ship.cls.torpMax * 0.95) this.fireTorp(ship);
-          if (ship.drones > 0 && d > 200 && d < 1500) this.fireDrone(ship);
-          if (ship.mines > 0 && d > 160 && d < 420) this.dropMine(ship);
-        }
-      }
-      if (ship.aiState === "docking") {
-        const base = this.nearestBase(ship);
-        if (this.dist(ship.x, ship.y, base.x, base.y) < 96 && ship.warp < 1.6) this.doDock(ship, base);
-      }
+      if (ship.isPlayer || ship.remote) continue;
+      this.flyComputer(ship, dt);
     }
 
     for (const ship of this.ships) this.moveShip(ship, dt);
@@ -1642,6 +1832,8 @@ export class TrekSim {
     p.intercept = false;
     p.lockId = null;
     p.courseYaw = null;
+    this.seekBase = false;
+    this.nav = null;
     this.clearAboard(p);
     p.drones = p.cls.drones ?? 0;
     p.mines = p.cls.mines ?? 0;
@@ -1735,6 +1927,9 @@ export class TrekSim {
       repair: p.repair,
       shieldsUp: p.raiseLatch,
       intercept: p.intercept,
+      autoLock: this.autoLock,
+      seekBase: this.seekBase,
+      aiPilot: this.aiPilot,
       transwarp: p.cls.transwarp,
       twReady: p.cls.transwarp && p.twCd <= 0 && p.twLeft <= 0,
       banked: Math.floor(p.banked),

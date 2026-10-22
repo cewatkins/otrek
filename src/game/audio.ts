@@ -1,4 +1,5 @@
 let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
 
 export function unlockAudio() {
   if (typeof window === "undefined") return;
@@ -6,8 +7,19 @@ export function unlockAudio() {
   if (ctx.state === "suspended") void ctx.resume();
 }
 
+function out(): AudioNode | null {
+  if (!ctx) return null;
+  if (!master) {
+    master = ctx.createGain();
+    master.gain.value = 0.33;
+    master.connect(ctx.destination);
+  }
+  return master;
+}
+
 function tone(freq: number, dur: number, type: OscillatorType, gain: number, slide = 0) {
-  if (!ctx || ctx.state !== "running") return;
+  const dest = out();
+  if (!ctx || !dest || ctx.state !== "running") return;
   const t = ctx.currentTime;
   const osc = ctx.createOscillator();
   const amp = ctx.createGain();
@@ -17,13 +29,14 @@ function tone(freq: number, dur: number, type: OscillatorType, gain: number, sli
   amp.gain.setValueAtTime(gain, t);
   amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   osc.connect(amp);
-  amp.connect(ctx.destination);
+  amp.connect(dest);
   osc.start(t);
   osc.stop(t + dur + 0.02);
 }
 
 function burst(freq: number, q: number, dur: number, gain: number) {
-  if (!ctx || ctx.state !== "running") return;
+  const dest = out();
+  if (!ctx || !dest || ctx.state !== "running") return;
   const t = ctx.currentTime;
   const frames = Math.max(1, Math.floor(ctx.sampleRate * dur));
   const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
@@ -40,7 +53,7 @@ function burst(freq: number, q: number, dur: number, gain: number) {
   amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(filter);
   filter.connect(amp);
-  amp.connect(ctx.destination);
+  amp.connect(dest);
   src.start(t);
   src.stop(t + dur + 0.02);
 }
@@ -49,13 +62,14 @@ let hailBuf: AudioBuffer | null = null;
 let hailLoading = false;
 
 function playHailBuffer() {
-  if (!ctx || ctx.state !== "running" || !hailBuf) return;
+  const dest = out();
+  if (!ctx || !dest || ctx.state !== "running" || !hailBuf) return;
   const src = ctx.createBufferSource();
   const amp = ctx.createGain();
   src.buffer = hailBuf;
   amp.gain.setValueAtTime(0.55, ctx.currentTime);
   src.connect(amp);
-  amp.connect(ctx.destination);
+  amp.connect(dest);
   src.start();
 }
 let introBus: GainNode | null = null;

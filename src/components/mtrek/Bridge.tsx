@@ -137,6 +137,9 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       if (e.code === "Period") sim.requestDock();
       if (e.code === "KeyU") sim.requestUndock();
       if (e.code === "Digit9" || e.code === "Numpad9") sim.toggleVerbose();
+      if (e.code === "Digit5" || e.code === "Numpad5") sim.toggleAutoLock();
+      if (e.code === "Digit2" || e.code === "Numpad2") sim.goToBase();
+      if (e.code === "Digit7" || e.code === "Numpad7") sim.toggleAiPilot();
       if (e.code === "KeyH" || e.code === "Slash") {
         setHelp((v) => {
           if (!v) setHelpPage(classId);
@@ -180,7 +183,9 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     const cmd = pointerCommand(sim, rect.width, rect.height, sx, sy);
+    if (!cmd) return;
     if (cmd.kind === "lock") sim.lockShip(cmd.id);
+    else if (cmd.go) sim.setWaypoint(cmd.x, cmd.y);
     else sim.setCourse(cmd.x, cmd.y);
   };
 
@@ -391,10 +396,10 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="key-marquee py-2 font-mono text-xs whitespace-nowrap text-muted">
             <span className="px-6">
-              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
+              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · 2 nearest base, dock and repair · 5 autolock · 7 AI helm · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
             </span>
             <span className="px-6" aria-hidden="true">
-              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
+              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · 2 nearest base, dock and repair · 5 autolock · 7 AI helm · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
             </span>
           </div>
         </div>
@@ -430,8 +435,10 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
             </div>
             {helpPage === "commands" ? (
             <ul className="mt-4 space-y-2 font-mono text-xs leading-relaxed text-fg">
-              <li><span className="text-amber">Flight.</span> W or Up raises warp, one step per tap and more if you hold it. S or Down lowers warp and then reverses. Shift+W also slows. A or Left turns left. D or Right turns right. Click empty space to come about. These keys still work if intercept is on.</li>
-              <li><span className="text-amber">Lock.</span> Click a ship on the radar or the forward view. Humans are a, b, c. Blue beams are yours. Red beams are theirs.</li>
+              <li><span className="text-amber">Flight.</span> W or Up raises warp, one step per tap and more if you hold it. S or Down lowers warp and then reverses. Shift+W also slows. A or Left turns left. D or Right turns right. Click empty space to come about. Click the long-range chart to plot a course to that point. These keys still work if intercept is on.</li>
+              <li><span className="text-amber">Lock.</span> Autolock is on when you launch. It holds the ship shooting at you, otherwise the closest one you can see. Press 5 to turn autolock off and pick a lock yourself. Click a ship on the radar or the forward view. Humans are a, b, c. Blue beams are yours. Red beams are theirs.</li>
+              <li><span className="text-amber">Base run.</span> 2 steers to the closest starbase, slows, docks, and the yard repairs the hull and refills everything. Press 2 again, or touch the helm, to cancel.</li>
+              <li><span className="text-amber">AI helm.</span> 7 hands your ship to the same captain the robots use. It hunts, shoots, flees, and docks. Press 7 again to take the helm back.</li>
               <li><span className="text-amber">Phasers.</span> Space, F, or P. A lock fires on that ship. No lock fires the forward arc for less damage. ESI hits every ship in range, and a crowd weakens each shot.</li>
               <li><span className="text-amber">Torpedoes.</span> T fires. Locked shots curve in. Unlocked shots fly straight. They hit harder the farther they travel. Empty tubes do not refill in flight. Dock to reload.</li>
               <li><span className="text-amber">Obliterators.</span> KEV-12 and KPB-13 put one torpedo back every two seconds. You still dock to fill the rack.</li>
@@ -519,6 +526,9 @@ function Status({ snap }: { snap: Snapshot }) {
       <Stat k="CLOAK" v={snap.canCloak ? (snap.cloakOn ? "ON" : "OFF") : "NONE"} />
       <Stat k="REPAIR" v={snap.repair ? "ON" : "OFF"} />
       <Stat k="SHIELD ORD" v={snap.shieldsUp ? "RAISE" : "HOLD"} />
+      <Stat k="AUTOLOCK" v={snap.autoLock ? "ON" : "OFF"} />
+      <Stat k="BASE RUN" v={snap.seekBase ? "ON" : "OFF"} />
+      <Stat k="AI HELM" v={snap.aiPilot ? "ON" : "OFF"} />
       <Stat k="INTERCEPT" v={snap.intercept ? "ON" : "OFF"} />
       {snap.transwarp && <Stat k="TRANSWARP" v={snap.twReady ? "READY" : "CYCLING"} />}
       <div className="border-t border-line pt-3">

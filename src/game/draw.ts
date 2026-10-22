@@ -29,6 +29,78 @@ const SPRITE_SRC: Record<string, string> = {
 
 const spriteCache = new Map<string, HTMLImageElement>();
 
+const BODY_SRC: Record<string, string> = {
+  earth: "/bodies/earth.png",
+  mars: "/bodies/mars.png",
+  jupiter: "/bodies/jupiter.png",
+  neptune: "/bodies/neptune.png",
+  venus: "/bodies/venus.png",
+  mercury: "/bodies/mercury.png",
+  europa: "/bodies/europa.png",
+  io: "/bodies/io.png",
+  moon: "/bodies/moon.png",
+  ceres: "/bodies/ceres.png",
+  saturn: "/bodies/saturn.png",
+  nebula: "/bodies/nebula.png",
+  carina: "/bodies/carina.png",
+  starbase: "/bodies/starbase.png",
+};
+
+const BODY_BY_NAME: Record<string, string> = {
+  Earth: "earth",
+  Vulcan: "mars",
+  Romulus: "neptune",
+  Klinzhai: "io",
+  Gorn: "venus",
+  Orion: "jupiter",
+  "Delta Vega": "europa",
+  Deneva: "moon",
+  Wrigley: "saturn",
+  "Rigel XII": "mercury",
+  Organia: "ceres",
+  "Mutara Nebula": "nebula",
+  "Asteroid Field": "ceres",
+  "Tholean Space": "carina",
+  Dana: "earth",
+  "Malibu Beta 6": "neptune",
+  Arrakis: "mars",
+  "Pleasure Planet": "venus",
+  Hawserion: "jupiter",
+  Newtonium: "mercury",
+};
+
+function bodyKey(name: string) {
+  return BODY_BY_NAME[name] ?? "starbase";
+}
+
+function bodySprite(key: string): HTMLImageElement | null {
+  if (typeof Image === "undefined") return null;
+  const src = BODY_SRC[key];
+  if (!src) return null;
+  let img = spriteCache.get(src);
+  if (!img) {
+    img = new Image();
+    img.decoding = "async";
+    img.src = src;
+    spriteCache.set(src, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+function paintBody(ctx: CanvasRenderingContext2D, key: string, x: number, y: number, size: number) {
+  const wide = key === "saturn" || key === "starbase";
+  const w = wide ? size * (key === "starbase" ? 1.9 : 2.2) : size;
+  const h = wide ? size * (key === "starbase" ? 0.85 : 1.05) : size;
+  const img = bodySprite(key);
+  if (!img) {
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.35, 0, Math.PI * 2);
+    ctx.stroke();
+    return;
+  }
+  ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+}
+
 function shipSprite(kind: string): HTMLImageElement | null {
   if (typeof Image === "undefined") return null;
   const src = SPRITE_SRC[kind];
@@ -293,40 +365,23 @@ export function drawTactical(
 
   for (const planet of planets) {
     const p = toScreen(cam, planet.x, planet.y);
-    ctx.fillStyle = "#221c14";
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = MUTED;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 24, 0.4, 2.2);
-    ctx.stroke();
+    const key = bodyKey(planet.name);
+    const size = key === "nebula" || key === "carina" ? 64 : 40;
+    paintBody(ctx, key, p.x, p.y, size);
     ctx.fillStyle = FG;
     ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(planet.name, p.x + 28, p.y + 4);
+    ctx.fillText(planet.name, p.x + size * 0.55, p.y + 4);
   }
 
   for (const base of bases) {
     const p = toScreen(cam, base.x, base.y);
-    ctx.strokeStyle = AMBER;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 3) * i - Math.PI / 6;
-      const x = p.x + Math.cos(a) * 14;
-      const y = p.y + Math.sin(a) * 14;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.stroke();
+    const key = bodyKey(base.name);
+    paintBody(ctx, key, p.x, p.y, key === "starbase" ? 52 : 44);
     ctx.fillStyle = AMBER;
     ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(base.num > 0 ? `SB${base.num} ${base.name}` : base.name, p.x + 20, p.y - 8);
+    ctx.fillText(base.num > 0 ? `SB${base.num} ${base.name}` : base.name, p.x + 28, p.y - 8);
     ctx.fillStyle = MUTED;
-    ctx.fillText(base.race, p.x + 20, p.y + 8);
+    ctx.fillText(base.race, p.x + 28, p.y + 8);
   }
 
   for (const g of sim.picks) {
@@ -476,17 +531,15 @@ function drawLongRange(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) 
     x: x0 + (wx / WORLD) * size,
     y: y0 + (wy / WORLD) * size,
   });
-  ctx.fillStyle = MUTED;
   for (const planet of PLANETS) {
     if (planet.quad !== quad) continue;
     const p = m(planet.x, planet.y);
-    ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+    paintBody(ctx, bodyKey(planet.name), p.x, p.y, 8);
   }
-  ctx.fillStyle = AMBER;
   for (const base of BASES) {
     if (base.quad !== quad) continue;
     const p = m(base.x, base.y);
-    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    paintBody(ctx, bodyKey(base.name), p.x, p.y, 10);
   }
   for (const hole of HOLES) {
     if (hole.quad !== quad) continue;
@@ -500,6 +553,17 @@ function drawLongRange(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) 
     const p = m(ship.x, ship.y);
     ctx.fillStyle = ship.isPlayer ? GOLD : ship.remote ? "#7ee0ff" : ALERT;
     ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
+  if (sim.nav) {
+    const p = m(sim.nav.x, sim.nav.y);
+    const me = m(sim.player.x, sim.player.y);
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(me.x, me.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.strokeRect(p.x - 4, p.y - 4, 8, 8);
   }
   ctx.fillStyle = GOLD;
   ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";
@@ -585,19 +649,22 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
     if (base.quad !== player.quad) continue;
     const p = project(player, base.x, base.y, pane);
     if (!p || p.fwd > 7000) continue;
-    const s = Math.max(10, p.size * 0.35);
-    ctx.strokeStyle = BLUE;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(p.sx, p.sy - s);
-    ctx.lineTo(p.sx + s, p.sy);
-    ctx.lineTo(p.sx, p.sy + s);
-    ctx.lineTo(p.sx - s, p.sy);
-    ctx.closePath();
-    ctx.stroke();
+    const key = bodyKey(base.name);
+    paintBody(ctx, key, p.sx, p.sy, Math.max(18, p.size * (key === "starbase" ? 0.7 : 0.55)));
     ctx.fillStyle = MUTED;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(base.num > 0 ? `SB${base.num}` : base.name, p.sx + s + 4, p.sy);
+    ctx.fillText(base.num > 0 ? `SB${base.num}` : base.name, p.sx + p.size * 0.4, p.sy);
+  }
+
+  for (const planet of PLANETS) {
+    if (planet.quad !== player.quad) continue;
+    const p = project(player, planet.x, planet.y, pane);
+    if (!p || p.fwd > 7000) continue;
+    const key = bodyKey(planet.name);
+    paintBody(ctx, key, p.sx, p.sy, Math.max(16, p.size * (key === "nebula" || key === "carina" ? 0.9 : 0.5)));
+    ctx.fillStyle = MUTED;
+    ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+    ctx.fillText(planet.name, p.sx + p.size * 0.35, p.sy);
   }
 
   const marks: { id: string; kind: string; name: string; yaw: number; flash: boolean; shield: number; sx: number; sy: number; size: number; fwd: number }[] = [];
@@ -696,7 +763,7 @@ export function pointerCommand(
   h: number,
   sx: number,
   sy: number,
-): { kind: "lock"; id: string } | { kind: "course"; x: number; y: number } {
+): { kind: "lock"; id: string } | { kind: "course"; x: number; y: number; go?: boolean } | null {
   const split = radarSplit(h);
   const longW = longWidth(w);
   const gauges = gaugeWidth(w);
@@ -708,9 +775,9 @@ export function pointerCommand(
       const nx = (sx - x0) / size;
       const ny = (sy - y0) / size;
       if (nx >= 0 && ny >= 0 && nx <= 1 && ny <= 1) {
-        return { kind: "course", x: nx * WORLD, y: ny * WORLD };
+        return { kind: "course", x: nx * WORLD, y: ny * WORLD, go: true };
       }
-      return { kind: "course", x: sim.player.x, y: sim.player.y };
+      return null;
     }
     if (sx < longW + gauges + 1) return { kind: "course", x: sim.player.x, y: sim.player.y };
     const radarW = Math.max(1, w - longW - gauges - 2);
