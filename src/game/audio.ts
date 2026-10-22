@@ -45,9 +45,22 @@ function burst(freq: number, q: number, dur: number, gain: number) {
   src.stop(t + dur + 0.02);
 }
 
-let introTimer: ReturnType<typeof setTimeout> | null = null;
+let hailBuf: AudioBuffer | null = null;
+let hailLoading = false;
+
+function playHailBuffer() {
+  if (!ctx || ctx.state !== "running" || !hailBuf) return;
+  const src = ctx.createBufferSource();
+  const amp = ctx.createGain();
+  src.buffer = hailBuf;
+  amp.gain.setValueAtTime(0.55, ctx.currentTime);
+  src.connect(amp);
+  amp.connect(ctx.destination);
+  src.start();
+}
 let introBus: GainNode | null = null;
 let introOn = false;
+let introTimer: ReturnType<typeof setTimeout> | null = null;
 
 const introNodes: OscillatorNode[] = [];
 const PHRASE = [196, 247, 294, 392, 494, 392, 330, 247];
@@ -149,5 +162,27 @@ export const sfx = {
   },
   warn() {
     tone(180, 0.2, "square", 0.02);
+  },
+  /** Boatswain's call, the ship hail. CC0 recording, Wikimedia Commons. */
+  hail() {
+    unlockAudio();
+    if (!ctx || ctx.state !== "running") return;
+    if (hailBuf) {
+      playHailBuffer();
+      return;
+    }
+    if (hailLoading) return;
+    hailLoading = true;
+    void fetch("/sfx/hail.ogg")
+      .then((res) => res.arrayBuffer())
+      .then((raw) => ctx?.decodeAudioData(raw))
+      .then((buf) => {
+        if (!buf) return;
+        hailBuf = buf;
+        playHailBuffer();
+      })
+      .catch(() => {
+        hailLoading = false;
+      });
   },
 };

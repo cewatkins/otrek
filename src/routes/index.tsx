@@ -15,6 +15,7 @@ function Home() {
     classId: string;
     id: number;
     room: string | null;
+    bots: boolean;
   } | null>(null);
 
   if (!flight && title) {
@@ -24,7 +25,7 @@ function Home() {
   if (!flight) {
     return (
       <Shipyard
-        onStart={(name, classId, room) => setFlight({ name, classId, id: Date.now(), room })}
+        onStart={(name, classId, room, bots) => setFlight({ name, classId, id: Date.now(), room, bots })}
       />
     );
   }
@@ -35,6 +36,7 @@ function Home() {
       name={flight.name}
       classId={flight.classId}
       room={flight.room}
+      bots={flight.bots}
       onLeave={() => setFlight(null)}
     />
   );

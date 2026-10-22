@@ -19,7 +19,7 @@ export function NetLink({ name, simRef, sendRef }: Props) {
   const hear = (from: string, text: string, n: number) => {
     if (!text || !n || heardHail.current.get(from) === n) return;
     heardHail.current.set(from, n);
-    simRef.current?.say(text.slice(0, 96), "amber");
+    simRef.current?.say(text.slice(0, 96), "hail");
   };
 
   const onMessage = (msg: BoardMsg) => {
@@ -78,6 +78,10 @@ export function NetLink({ name, simRef, sendRef }: Props) {
           const hit = sim.lastStrike;
           if (peer && hit) board.publish({ kind: "hit", to: peer, dmg: raw, n: hit.n, by: sim.player.name });
         };
+        sim.setRoster(
+          selfId,
+          board.humans.filter((human) => human.playing).map((human) => human.id),
+        );
       }
       if (sim && now - last > 400) {
         last = now;

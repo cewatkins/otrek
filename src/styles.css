@@ -40,6 +40,33 @@
   }
 }
 
+@keyframes hail-flash {
+  0%,
+  100% {
+    color: #ffe14a;
+    opacity: 1;
+  }
+  45% {
+    color: #fff7b0;
+    opacity: 0.2;
+  }
+}
+
+@keyframes key-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.key-marquee {
+  display: flex;
+  width: max-content;
+  animation: key-marquee 48s linear infinite;
+}
+
 .pulse-alert {
   animation: alert-pulse 1.2s ease-in-out infinite;
 }

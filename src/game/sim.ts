@@ -54,7 +54,7 @@ export type Particle = {
   alert: boolean;
   size: number;
 };
-export type Line = { text: string; tone: "info" | "alert" | "amber" };
+export type Line = { text: string; tone: "info" | "alert" | "amber" | "hail"; at?: number };
 
 export type Ship = {
   id: string;
@@ -457,6 +457,7 @@ export class TrekSim {
   onStrike: ((peerId: string, raw: number) => void) | null = null;
   private edgeNote = 0;
   private noTgt = 0;
+  private warpNote = 0;
 
   constructor(name: string, classId: string, opts?: { bots?: boolean }) {
     const cls = classById(classId);
@@ -530,11 +531,28 @@ export class TrekSim {
     return this.inputOverride ?? this.keys;
   }
 
+  /** One keypress. W raises warp. S lowers it, then backs up. */
+  nudgeWarp(dir: 1 | -1) {
+    const p = this.player;
+    if (!p.alive || p.docked || this.over || p.twLeft > 0) return;
+    p.intercept = false;
+    if (dir > 0 && p.energy < 8) {
+      if (this.t > this.warpNote) {
+        this.warpNote = this.t + 2;
+        this.say("Not enough energy to raise warp.", "alert");
+      }
+      return;
+    }
+    const next = dir > 0 ? Math.min(p.cls.maxWarp, p.warp + 0.4) : Math.max(-2, p.warp - 0.4);
+    p.warp = Math.round(next * 10) / 10;
+  }
+
   verbose = false;
 
   say(text: string, tone: Line["tone"] = "info") {
     if (!this.verbose && quietLine(text)) return;
-    this.messages = [{ text, tone }, ...this.messages].slice(0, 8);
+    if (tone === "hail") sfx.hail();
+    this.messages = [{ text, tone, at: this.t }, ...this.messages].slice(0, 8);
   }
 
   toggleVerbose() {
@@ -624,6 +642,29 @@ export class TrekSim {
     ship.hull = clamp(Number(pose.hull) || 0, 0, ship.cls.hull);
     ship.cloaked = Boolean(pose.cloaked);
     ship.docked = Boolean(pose.docked);
+  }
+
+  /** Humans take a, b, c in the same order on every screen. Robots follow. */
+  setRoster(selfNetId: string, otherNetIds: string[]) {
+    const alpha = "abcdefghijklmnopqrstuvwxyz";
+    const ids = [...new Set([selfNetId, ...otherNetIds].filter(Boolean))].sort();
+    const letterOf = (id: string) => alpha[ids.indexOf(id)] ?? "z";
+    this.player.letter = letterOf(selfNetId);
+    const used = new Set<string>([this.player.letter]);
+    for (const ship of this.ships) {
+      if (!ship.remote) continue;
+      ship.letter = letterOf(ship.id.slice(4));
+      used.add(ship.letter);
+    }
+    let n = ids.length;
+    for (const ship of this.ships) {
+      if (ship.isPlayer || ship.remote) continue;
+      while (n < alpha.length && used.has(alpha[n])) n += 1;
+      const letter = alpha[n] ?? "z";
+      ship.letter = letter;
+      used.add(letter);
+      n += 1;
+    }
   }
 
   dropRemotes(peerIds: string[]) {
@@ -756,7 +797,7 @@ export class TrekSim {
   hail(text: string) {
     const msg = text.trim().slice(0, 80);
     if (!msg) return;
-    this.say(`${this.player.name}: ${msg}`, "amber");
+    this.say(`${this.player.name}: ${msg}`, "hail");
     const foe = this.ships.find((s) => s.alive && !s.isPlayer && !s.docked);
     if (!foe) return;
     const lines = [
@@ -1310,7 +1351,7 @@ export class TrekSim {
         ship.hull = Math.min(ship.cls.hull, ship.hull + 18 * dt);
         ship.energy -= 4 * dt;
       }
-      let drain = ship.warp * 0.85;
+      let drain = Math.abs(ship.warp) * 0.85;
       if (ship.cloaked) drain += 7;
       ship.energy = clamp(ship.energy + (3 - drain) * dt, 0, ship.cls.energy);
       if (ship.energy < 8) ship.cloaked = false;
@@ -1349,9 +1390,13 @@ export class TrekSim {
       if (held.has("KeyA") || held.has("ArrowLeft")) steer += 1;
       if (held.has("KeyD") || held.has("ArrowRight")) steer -= 1;
       steer = clamp(steer + this.touchSteer, -1, 1);
-      const warpUp = ((held.has("KeyW") || held.has("ArrowUp")) && !shift) || this.touchWarp > 0;
+      const warpUp = this.touchWarp > 0 || ((held.has("KeyW") || held.has("ArrowUp")) && !shift);
       const warpDn =
-        held.has("KeyS") || held.has("ArrowDown") || (held.has("KeyW") && shift) || this.touchWarp < 0;
+        this.touchWarp < 0 ||
+        held.has("KeyS") ||
+        held.has("ArrowDown") ||
+        ((held.has("KeyW") || held.has("ArrowUp")) && shift);
+      if (warpUp || warpDn) p.intercept = false;
       if (p.twLeft > 0 && p.cls.teleport) {
         p.intercept = false;
         p.courseYaw = null;
@@ -1375,9 +1420,9 @@ export class TrekSim {
         this.steerToward(p, p.courseYaw, dt);
         if (Math.abs(angDiff(p.yaw, p.courseYaw)) < 0.04) p.courseYaw = null;
       }
-      if (p.twLeft <= 0 && !p.intercept) {
+      if (p.twLeft <= 0) {
         if (warpUp && p.energy >= 8) p.warp = Math.min(p.cls.maxWarp, p.warp + WARP_ACCEL * dt);
-        if (warpDn) p.warp = Math.max(0, p.warp - WARP_ACCEL * dt);
+        if (warpDn) p.warp = Math.max(-2, p.warp - WARP_ACCEL * dt);
       }
       if ((held.has("Space") || held.has("KeyF") || held.has("KeyP") || this.touchPhaser) && p.phaserCd <= 0) {
         if (p.cls.agonizer && p.magazine <= 0) {

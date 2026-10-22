@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { unlockAudio } from "@/game/audio";
 import { cameraFor, drawTactical, pointerCommand } from "@/game/draw";
 import { saveScore } from "@/game/scores";
+import { CLASSES, classById, type ShipClass } from "@/game/classes";
 import { TrekSim, type Snapshot } from "@/game/sim";
 import { NetLink } from "@/components/mtrek/NetLink";
 
@@ -20,6 +21,7 @@ type Props = {
   name: string;
   classId: string;
   room: string | null;
+  bots?: boolean;
   onLeave: () => void;
 };
 
@@ -33,19 +35,20 @@ function clock(s: number) {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
-export function Bridge({ name, classId, room, onLeave }: Props) {
+export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const simRef = useRef<TrekSim | null>(null);
   const netSend = useRef<((data: unknown) => void) | null>(null);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [paused, setPaused] = useState(false);
   const [help, setHelp] = useState(false);
+  const [helpPage, setHelpPage] = useState("commands");
   const [hail, setHail] = useState("");
   const pausedRef = useRef(false);
   pausedRef.current = paused || help;
 
   useEffect(() => {
-    const sim = new TrekSim(name, classId);
+    const sim = new TrekSim(name, classId, { bots });
     simRef.current = sim;
     sim.onBank = (ship) => {
       saveScore({
@@ -114,9 +117,13 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       const target = e.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
       sim.keys.add(e.code);
-      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
         e.preventDefault();
       }
+      const warpUp = (e.code === "KeyW" || e.code === "ArrowUp") && !e.shiftKey;
+      const warpDn =
+        e.code === "KeyS" || e.code === "ArrowDown" || ((e.code === "KeyW" || e.code === "ArrowUp") && e.shiftKey);
+      if ((warpUp || warpDn) && !e.repeat) sim.nudgeWarp(warpUp ? 1 : -1);
       if (e.repeat) return;
       if (e.code === "KeyR" && e.shiftKey) {
         sim.dropShields();
@@ -130,7 +137,12 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       if (e.code === "Period") sim.requestDock();
       if (e.code === "KeyU") sim.requestUndock();
       if (e.code === "Digit9" || e.code === "Numpad9") sim.toggleVerbose();
-      if (e.code === "KeyH" || e.code === "Slash") setHelp((v) => !v);
+      if (e.code === "KeyH" || e.code === "Slash") {
+        setHelp((v) => {
+          if (!v) setHelpPage(classId);
+          return !v;
+        });
+      }
       if (e.code === "Escape") setPaused((v) => !v);
     };
     const up = (e: KeyboardEvent) => {
@@ -157,7 +169,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       window.removeEventListener("blur", blur);
       delete window.__controlsTest;
     };
-  }, [name, classId]);
+  }, [name, classId, bots]);
 
   const onPointer = (e: PointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
@@ -235,10 +247,10 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => setPaused(true)}
-            className="h-10 border border-line px-3 font-mono text-xs text-fg"
+            onClick={() => setPaused((v) => !v)}
+            className={`h-10 border px-3 font-mono text-xs ${paused ? "border-amber text-amber" : "border-line text-fg"}`}
           >
-            Pause
+            {paused ? "Resume" : "Pause"}
           </button>
         </div>
       </header>
@@ -266,6 +278,18 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
             className="h-full w-full touch-none"
             aria-label="Tactical display"
           />
+          {(() => {
+            const line = snap?.messages.find((entry) => entry.tone === "hail");
+            if (!line || !snap || snap.t - (line.at ?? 0) > 4) return null;
+            return (
+              <p
+                key={`${line.at}-${line.text}`}
+                className="hail-flash pointer-events-none absolute top-16 left-1/2 z-10 max-w-lg -translate-x-1/2 px-3 text-center font-mono text-sm font-semibold"
+              >
+                {line.text}
+              </p>
+            );
+          })()}
           {snap?.docked && (
             <div className="pointer-events-none absolute top-3 left-3 border border-amber bg-bg/90 px-3 py-2 font-mono text-xs text-amber">
               DOCKED · {snap.dockName}
@@ -356,27 +380,73 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
         </button>
       </form>
 
-      <footer className="hidden shrink-0 items-center gap-3 border-t border-line px-4 py-2 md:flex">
-        <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted">
-          W/S warp · A/D turn · click lock or course · Space phasers · T torpedoes · G drones · M mines · R shields · C repair · Z cloak · I intercept · . dock · U undock
-        </p>
+      <footer className="hidden shrink-0 items-stretch border-t border-line md:flex">
+        <button
+          type="button"
+          onClick={() => setPaused((v) => !v)}
+          className={`shrink-0 border-r border-line px-4 font-mono text-xs ${paused ? "text-amber" : "text-fg"}`}
+        >
+          {paused ? "Resume" : "Pause"}
+        </button>
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="key-marquee py-2 font-mono text-xs whitespace-nowrap text-muted">
+            <span className="px-6">
+              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
+            </span>
+            <span className="px-6" aria-hidden="true">
+              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
+            </span>
+          </div>
+        </div>
       </footer>
 
       {(paused || help) && snap?.phase !== "dead" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg/80 p-4">
-          <div className="w-full max-w-md border border-line bg-surface p-5">
-            <p className="font-mono text-xs tracking-widest text-amber">{help ? "COMMANDS" : "PAUSED"}</p>
-            <h2 className="mt-1 font-sans text-xl font-semibold">{help ? "How to fight" : snap?.name}</h2>
-            <ul className="mt-4 space-y-1 font-mono text-xs leading-relaxed text-fg">
-              <li>The top of the window is the radar. The bottom is the forward view. Click either one to lock a ship. Blue phasers are yours. Red phasers are theirs.</li>
-              <li>A turns left, D turns right. Click empty space to come about.</li>
-              <li>Click a ship to lock. Locked torpedoes curve in. Unlocked ones fly straight.</li>
-              <li>Phasers need a lock or a target in the forward arc. ESI hits everyone in range. Agonizers are flat and spend a torpedo. G launches a drone. M drops a mine.</li>
-              <li>Dock inside 100 units under warp 1.4. Gold paid there is (damage + veteran bonus) / 10. Klingon obliterators return one every two seconds.</li>
-              <li>R raises shields. Shift+R drops them. C repairs the hull. Dilithium soaks damage that gets through the shields and refills when you dock. Planets trickle energy.</li>
-              <li>Wormholes open and shut about once a minute. Cloaked ships cannot enter, and the same ship must wait a minute to transit again.</li>
-              <li>9 shows dock, undock, and vault lines. They stay hidden otherwise.</li>
+          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto border border-line bg-surface p-5">
+            <p className="font-mono text-xs tracking-widest text-amber">{help ? "HELP" : "PAUSED"}</p>
+            <h2 className="mt-1 font-sans text-xl font-semibold">
+              {helpPage === "commands" ? (help ? "How to fight" : snap?.name) : classById(helpPage).name}
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setHelpPage("commands")}
+                className={`border px-2 py-1 font-mono text-[10px] ${helpPage === "commands" ? "border-amber text-amber" : "border-line text-muted"}`}
+              >
+                Commands
+              </button>
+              {CLASSES.map((cls) => (
+                <button
+                  key={cls.id}
+                  type="button"
+                  onClick={() => setHelpPage(cls.id)}
+                  className={`border px-2 py-1 font-mono text-[10px] ${
+                    helpPage === cls.id ? "border-amber text-amber" : cls.id === classId ? "border-line text-fg" : "border-line text-muted"
+                  }`}
+                >
+                  {cls.code}
+                </button>
+              ))}
+            </div>
+            {helpPage === "commands" ? (
+            <ul className="mt-4 space-y-2 font-mono text-xs leading-relaxed text-fg">
+              <li><span className="text-amber">Flight.</span> W or Up raises warp, one step per tap and more if you hold it. S or Down lowers warp and then reverses. Shift+W also slows. A or Left turns left. D or Right turns right. Click empty space to come about. These keys still work if intercept is on.</li>
+              <li><span className="text-amber">Lock.</span> Click a ship on the radar or the forward view. Humans are a, b, c. Blue beams are yours. Red beams are theirs.</li>
+              <li><span className="text-amber">Phasers.</span> Space, F, or P. A lock fires on that ship. No lock fires the forward arc for less damage. ESI hits every ship in range, and a crowd weakens each shot.</li>
+              <li><span className="text-amber">Torpedoes.</span> T fires. Locked shots curve in. Unlocked shots fly straight. They hit harder the farther they travel. Empty tubes do not refill in flight. Dock to reload.</li>
+              <li><span className="text-amber">Obliterators.</span> KEV-12 and KPB-13 put one torpedo back every two seconds. You still dock to fill the rack.</li>
+              <li><span className="text-amber">Agonizers.</span> The warbird's phasers are flat and each shot spends one torpedo.</li>
+              <li><span className="text-amber">Drones and mines.</span> G launches a drone. M drops a mine. Both classes that carry them reload only by docking.</li>
+              <li><span className="text-amber">Dock.</span> Close inside 100 of a starbase and drop under warp 1.4, then press . (period). Docking refills hull, shields, energy, torpedoes, drones, mines, and dilithium. Gold aboard is banked: damage dealt, plus veteran bonus, divided by 10. U undocks. You cannot shoot while docked.</li>
+              <li><span className="text-amber">Shields and repair.</span> R latches shields up. Shift+R drops them. C toggles damage control, which spends energy to mend the hull. Dilithium soaks hits that punch the shields. Feeding planets trickle energy if you orbit them.</li>
+              <li><span className="text-amber">Cloak.</span> Z, on a ship that has one. It burns energy. You cannot fire, and a cloaked ship cannot take a wormhole. Other ships lose you past short range.</li>
+              <li><span className="text-amber">Intercept and transwarp.</span> I steers onto the locked ship. X engages transwarp and spends energy. An Excelsior tracks the lock. A DY-600 teleporter overshoots and will not track. The teleporter phaser also shoves you clear of the target.</li>
+              <li><span className="text-amber">Wormholes.</span> They open and shut about once a minute. The same ship must wait a minute to transit again. The rim of the quadrant turns you about.</li>
+              <li><span className="text-amber">Hail and log.</span> Type at the bottom and press Send. A hail flashes yellow and the boatswain's pipe sounds. 9 shows dock, undock, and vault lines. H or / opens this list. Esc pauses. The codes above open one page per ship.</li>
             </ul>
+            ) : (
+              <ShipPage cls={classById(helpPage)} yours={helpPage === classId} />
+            )}
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
@@ -395,6 +465,39 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ShipPage({ cls, yours }: { cls: ShipClass; yours: boolean }) {
+  const lines = [
+    `${cls.race}. Home ${cls.home}. Cruise warp ${cls.cruise}, damage warp ${cls.maxWarp}. Hull ${cls.hull}. Scan ${cls.scan}.`,
+    `${cls.torpName} × ${cls.magazine}. ${cls.torpMin}–${cls.torpMax}. They hit harder the farther they fly. Dock to reload the tubes.`,
+    `Phasers ${cls.phaser} out to ${cls.phaserRange}. Space, F, or P.`,
+  ];
+  if (cls.esi) lines.push("Expanding-sphere phasers hit every ship in range. A crowd splits the shot. A duel does not.");
+  if (cls.agonizer) lines.push("Agonizers are flat. Each phaser shot spends one torpedo. An empty rack cannot fire them.");
+  if (cls.regenTorp) lines.push("Obliterators grow back, one every two seconds. Docking still fills the rack.");
+  if (cls.teleport) lines.push("The phaser shoves you clear of the target. Transwarp flies straight and will not track. Press X.");
+  else if (cls.transwarp) lines.push("Transwarp tracks a locked ship. Press X. It spends energy.");
+  if (cls.cloak) lines.push("Z cloaks. You cannot fire, and a cloaked ship cannot take a wormhole.");
+  else lines.push("No cloak on this class.");
+  if ((cls.drones ?? 0) > 0) lines.push(`G launches a drone. ${cls.drones} aboard${cls.droneVar ? ", and each one leaves at a different speed" : ""}. Dock to reload.`);
+  if ((cls.mines ?? 0) > 0) lines.push(`M drops a mine. ${cls.mines} aboard. Dock to reload.`);
+  if ((cls.crystals ?? 0) > 0) lines.push(`${cls.crystals} dilithium crystals soak hits that punch the shields. Dock refills them.`);
+  lines.push("Get inside 100 of a starbase, under warp 1.4, and press . to dock. U undocks.");
+  return (
+    <div className="mt-4">
+      <p className="font-mono text-[10px] tracking-widest text-muted">
+        {cls.code}
+        {yours ? " · YOUR SHIP" : ""}
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-fg">{cls.blurb}</p>
+      <ul className="mt-3 space-y-2 font-mono text-xs leading-relaxed text-fg">
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -490,7 +593,13 @@ function Scanner({
             <p
               key={`${i}-${line.text}`}
               className={`font-mono text-xs leading-relaxed ${
-                line.tone === "alert" ? "text-alert" : line.tone === "amber" ? "text-amber" : "text-muted"
+                line.tone === "hail"
+                  ? "hail-flash"
+                  : line.tone === "alert"
+                    ? "text-alert"
+                    : line.tone === "amber"
+                      ? "text-amber"
+                      : "text-muted"
               }`}
             >
               {line.text}

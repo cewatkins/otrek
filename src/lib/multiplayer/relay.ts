@@ -12,6 +12,7 @@ export type BoardMsg = {
   kind?: string;
   to?: string;
   dmg?: number;
+  n?: number;
   by?: string;
   classId?: string;
   x?: number;

@@ -5,20 +5,22 @@ import { loadCallsign, loadScores, saveCallsign, type ScoreRow } from "@/game/sc
 import { useBoard } from "@/lib/multiplayer/use-board";
 
 type Props = {
-  onStart: (name: string, classId: string, room: string | null) => void;
+  onStart: (name: string, classId: string, room: string | null, bots: boolean) => void;
 };
 
 const QUADRANT = "ALPHA";
+type Mode = "solo" | "quadrant" | "humans";
 
 export function Shipyard({ onStart }: Props) {
   const [classId, setClassId] = useState(CLASSES[0].id);
   const [name, setName] = useState("USS Intrepid");
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [real, setReal] = useState(true);
-  const [shared, setShared] = useState(true);
+  const [mode, setMode] = useState<Mode>("quadrant");
   const [lobbyId] = useState(() => `w-${Math.random().toString(36).slice(2, 10)}`);
   const selected = CLASSES.find((c) => c.id === classId) ?? CLASSES[0];
-  const live = useBoard(lobbyId, name.trim().slice(0, 18) || "unnamed", false, shared);
+  const linked = mode !== "solo";
+  const live = useBoard(lobbyId, name.trim().slice(0, 18) || "unnamed", false, linked);
 
   useEffect(() => {
     const saved = loadCallsign();
@@ -26,7 +28,8 @@ export function Shipyard({ onStart }: Props) {
     if (CLASSES.some((c) => c.id === saved.classId)) setClassId(saved.classId);
     setScores(loadScores());
     const q = new URLSearchParams(window.location.search);
-    if (q.get("play") === "quadrant" || q.get("room")) setShared(true);
+    if (q.get("play") === "humans") setMode("humans");
+    else if (q.get("play") === "quadrant" || q.get("room")) setMode("quadrant");
   }, []);
 
   const launch = () => {
@@ -34,10 +37,11 @@ export function Shipyard({ onStart }: Props) {
     saveCallsign(trimmed, selected.id);
     const url = new URL(window.location.href);
     url.searchParams.delete("room");
-    if (shared) url.searchParams.set("play", "quadrant");
+    if (mode === "humans") url.searchParams.set("play", "humans");
+    else if (mode === "quadrant") url.searchParams.set("play", "quadrant");
     else url.searchParams.delete("play");
     window.history.replaceState(null, "", url);
-    onStart(trimmed, selected.id, shared ? QUADRANT : null);
+    onStart(trimmed, selected.id, linked ? QUADRANT : null, mode !== "humans");
   };
 
   const sheet = SHEETS[selected.id];
@@ -54,9 +58,9 @@ export function Shipyard({ onStart }: Props) {
           </div>
           <div className="min-w-[16rem] flex-1 border border-line bg-surface px-3 py-2">
             <p className="font-mono text-[10px] tracking-widest text-amber">
-              HUMANS · {(live.humans.length || 0) + (shared ? 1 : 0)}
+              HUMANS · {(live.humans.length || 0) + (linked ? 1 : 0)}
             </p>
-            {!shared ? (
+            {!linked ? (
               <p className="mt-1 font-mono text-xs text-muted">Solo. Other players cannot see this ship.</p>
             ) : (
               <ul className="mt-1 space-y-0.5 font-mono text-xs">
@@ -70,7 +74,7 @@ export function Shipyard({ onStart }: Props) {
               </ul>
             )}
             {live.notice ? <p className="mt-1 font-mono text-xs text-amber">{live.notice}</p> : null}
-            <p className="mt-1 font-mono text-[10px] text-muted">{shared ? live.status : ""}</p>
+            <p className="mt-1 font-mono text-[10px] text-muted">{linked ? live.status : ""}</p>
           </div>
           <button
             type="button"
@@ -159,16 +163,29 @@ export function Shipyard({ onStart }: Props) {
             <h3 className="font-mono text-xs tracking-widest text-muted">QUADRANT</h3>
             <p className="mt-1 text-xs leading-relaxed text-muted">
               One room, like the original. Everyone starts in Alpha. The wormhole is the door to Beta.
-              These robots fly that board. Solo is you and them. Quadrant adds whoever else is here.
+              Solo is you and the robots. Quadrant adds whoever else is here. Humans only is that same
+              board with no robots.
             </p>
-            {!shared || live.humans.length === 0 ? (
+            {!linked || live.humans.length === 0 ? (
               <p className="mt-3 border border-line px-3 py-3 font-mono text-xs text-muted">
-                {shared ? live.status === "on the board" ? "No other players yet. The robots are already out." : live.status : "Solo. The robots are already out."}
+                {mode === "solo"
+                  ? "Solo. The robots are already out."
+                  : mode === "humans"
+                    ? live.status === "on the board"
+                      ? "No other players yet. No robots in this mode."
+                      : live.status
+                    : live.status === "on the board"
+                      ? "No other players yet. The robots are already out."
+                      : live.status}
               </p>
             ) : (
               <p className="mt-3 font-mono text-xs text-amber">{live.notice || "The list above is every human on this board."}</p>
             )}
-            <p className="mt-2 text-sm text-muted">{QUADRANT_ROBOTS.join(" · ")}</p>
+            {mode === "humans" ? (
+              <p className="mt-2 text-sm text-muted">No robots.</p>
+            ) : (
+              <p className="mt-2 text-sm text-muted">{QUADRANT_ROBOTS.join(" · ")}</p>
+            )}
           </section>
 
           {real ? (
@@ -319,24 +336,32 @@ export function Shipyard({ onStart }: Props) {
           <span className="font-mono text-xs text-muted">PLAY</span>
           <button
             type="button"
-            aria-pressed={!shared}
-            onClick={() => setShared(false)}
-            className={`h-11 border px-4 font-mono text-xs ${shared ? "border-line" : "border-amber text-amber"}`}
+            aria-pressed={mode === "solo"}
+            onClick={() => setMode("solo")}
+            className={`h-11 border px-4 font-mono text-xs ${mode === "solo" ? "border-amber text-amber" : "border-line"}`}
           >
             Solo
           </button>
           <button
             type="button"
-            aria-pressed={shared}
-            onClick={() => setShared(true)}
-            className={`h-11 border px-4 font-mono text-xs ${shared ? "border-amber text-amber" : "border-line"}`}
+            aria-pressed={mode === "quadrant"}
+            onClick={() => setMode("quadrant")}
+            className={`h-11 border px-4 font-mono text-xs ${mode === "quadrant" ? "border-amber text-amber" : "border-line"}`}
           >
             Quadrant
           </button>
+          <button
+            type="button"
+            aria-pressed={mode === "humans"}
+            onClick={() => setMode("humans")}
+            className={`h-11 border px-4 font-mono text-xs ${mode === "humans" ? "border-amber text-amber" : "border-line"}`}
+          >
+            Humans only
+          </button>
         </div>
         <p className="font-mono text-xs text-muted">
-          Solo is you and the robot ships, not other players. Quadrant is that same board, plus
-          whoever else is here. The fight with them goes browser to browser.
+          Solo is you and the robot ships. Quadrant is that board plus whoever else is here.
+          Humans only is the same fight with no robots.
         </p>
         <div className="flex items-end gap-3">
         <label className="min-w-0 flex-1">
