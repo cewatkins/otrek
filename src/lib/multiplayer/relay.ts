@@ -24,7 +24,8 @@ export type BoardMsg = {
   cloaked?: boolean;
   docked?: boolean;
   alive?: boolean;
-  quad?: "A" | "B";
+  z?: number;
+  quad?: "A" | "B" | "G" | "O";
 };
 
 type Listener = (msg: BoardMsg) => void;

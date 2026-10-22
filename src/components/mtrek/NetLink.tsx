@@ -90,6 +90,7 @@ export function NetLink({ name, simRef, sendRef }: Props) {
           classId: p.cls.id,
           x: p.x,
           y: p.y,
+          z: p.z,
           yaw: p.yaw,
           warp: p.warp,
           shield: p.shield,

@@ -1,26 +1,36 @@
 import { sfx } from "@/game/audio";
+import { CHART, type ChartRow } from "@/game/chart";
 import { classById, type ShipClass } from "@/game/classes";
 
 export const WORLD = 9000;
 const WARP_SPEED = 78;
 const WARP_ACCEL = 2.5;
+const CLIMB = WARP_SPEED * 5;
 
-export type Quad = "A" | "B";
-export type Base = {
+export type Quad = "A" | "B" | "G" | "O";
+export type Spot = {
   id: string;
   num: number;
   name: string;
   race: string;
+  kind: ChartRow["kind"];
   x: number;
   y: number;
+  z: number;
+  r: number;
   quad: Quad;
+  dock: boolean;
+  feed: boolean;
 };
-export type Planet = { name: string; x: number; y: number; quad: Quad; feed: boolean };
+export type Base = Spot;
+export type Planet = Spot;
 export type Bolt = {
   x: number;
   y: number;
+  z: number;
   vx: number;
   vy: number;
+  vz: number;
   dmg: number;
   owner: string;
   traveled: number;
@@ -42,8 +52,8 @@ export type Beam = {
   esi: boolean;
   byPlayer: boolean;
 };
-export type Pickup = { x: number; y: number; gold: number; life: number };
-export type Mine = { x: number; y: number; dmg: number; owner: string; life: number; arm: number };
+export type Pickup = { x: number; y: number; z: number; gold: number; life: number };
+export type Mine = { x: number; y: number; z: number; dmg: number; owner: string; life: number; arm: number };
 export type Particle = {
   x: number;
   y: number;
@@ -64,6 +74,7 @@ export type Ship = {
   isPlayer: boolean;
   x: number;
   y: number;
+  z: number;
   yaw: number;
   warp: number;
   hull: number;
@@ -109,6 +120,7 @@ export type Ship = {
   aiState: "hunt" | "flee" | "patrol" | "docking";
   patrolX: number;
   patrolY: number;
+  patrolZ: number;
   orbitSign: number;
   bias: number;
   home: string;
@@ -116,12 +128,13 @@ export type Ship = {
   born: number;
   goalYaw: number;
   goalWarp: number;
+  goalZ: number;
   missNote: number;
   /** Dilithium still in the hold. Soaks damage that gets through shields. */
   crystals: number;
   /** Another player's ship. Pose comes from them; this client does not fly it. */
   remote: boolean;
-  /** Alpha is where every ship starts. The wormhole is the door to Beta. */
+  /** Alpha is where every ship starts. Wormholes cycle Alpha, Beta, Gamma, Omega. */
   quad: Quad;
 };
 
@@ -160,6 +173,7 @@ export type Snapshot = {
   warp: number;
   maxWarp: number;
   heading: number;
+  z: number;
   energy: number;
   energyMax: number;
   shield: number;
@@ -175,7 +189,7 @@ export type Snapshot = {
   crystals: number;
   crystalsMax: number;
   holeOpen: boolean;
-  quad: "ALPHA" | "BETA";
+  quad: "ALPHA" | "BETA" | "GAMMA" | "OMEGA";
   cloakOn: boolean;
   canCloak: boolean;
   repair: boolean;
@@ -209,93 +223,65 @@ export type Snapshot = {
   shake: number;
 };
 
-export const BASES: Base[] = [];
-export const PLANETS: Planet[] = [];
-export const HOLES: { quad: Quad; x: number; y: number }[] = [];
-
-function layChart(
-  rows: { id: string; num: number; name: string; race: string; x: number; y: number; dock: boolean; feed: boolean }[],
-  quad: Quad,
-  holeAt: { x: number; y: number } | null,
-) {
-  const minX = Math.min(...rows.map((r) => r.x));
-  const maxX = Math.max(...rows.map((r) => r.x));
-  const minY = Math.min(...rows.map((r) => r.y));
-  const maxY = Math.max(...rows.map((r) => r.y));
-  const span = Math.max(maxX - minX, maxY - minY) || 1;
-  const scale = 7600 / span;
-  const ox = (WORLD - (maxX - minX) * scale) / 2;
-  const oy = (WORLD - (maxY - minY) * scale) / 2;
-  const pt = (x: number, y: number) => ({
-    x: ox + (x - minX) * scale,
-    y: oy + (maxY - y) * scale,
-  });
-  for (const row of rows) {
-    const p = pt(row.x, row.y);
-    if (row.dock) BASES.push({ id: row.id, num: row.num, name: row.name, race: row.race, quad, ...p });
-    else PLANETS.push({ name: row.name, quad, feed: row.feed, ...p });
-  }
-  const mouth = holeAt ?? {
-    x: rows.reduce((s, r) => s + r.x, 0) / rows.length,
-    y: rows.reduce((s, r) => s + r.y, 0) / rows.length,
-  };
-  HOLES.push({ quad, ...pt(mouth.x, mouth.y) });
+function raceOf(row: ChartRow) {
+  if (row.kind === "base") return "Starbase";
+  if (row.kind === "star") return "Star";
+  if (row.kind === "hazard") return "Hazard";
+  if (row.kind === "comet") return "Comet";
+  if (row.kind === "hole") return "Wormhole";
+  return "Planet";
 }
 
-/** Coordinates from the mtrek.com FAQ chart. Alpha is the quadrant every ship starts in. */
-layChart(
-  [
-    { id: "SB1", num: 1, name: "Starbase 1", race: "Starbase", x: -6150, y: -13432, dock: true, feed: false },
-    { id: "SB2", num: 2, name: "Starbase 2", race: "Starbase", x: 7803, y: -10300, dock: true, feed: false },
-    { id: "SB3", num: 3, name: "Starbase 3", race: "Starbase", x: -6000, y: 10020, dock: true, feed: false },
-    { id: "SB4", num: 4, name: "Starbase 4", race: "Starbase", x: -11400, y: 17000, dock: true, feed: false },
-    { id: "SB5", num: 5, name: "Babylon 5", race: "Starbase", x: -18400, y: 20730, dock: true, feed: false },
-    { id: "SB6", num: 6, name: "Starbase 6", race: "Starbase", x: -29600, y: 17000, dock: true, feed: false },
-    { id: "SB7", num: 7, name: "K-7", race: "Starbase", x: 21800, y: 16000, dock: true, feed: false },
-    { id: "SB8", num: 8, name: "Starbase 8", race: "Starbase", x: 28000, y: 5000, dock: true, feed: false },
-    { id: "SB9", num: 9, name: "Starbase 9", race: "Starbase", x: 33900, y: -10500, dock: true, feed: false },
-    { id: "SB10", num: 10, name: "Starbase 10", race: "Starbase", x: 24000, y: -24000, dock: true, feed: false },
-    { id: "EARTH", num: 0, name: "Earth", race: "Federation", x: 2000, y: 2025, dock: true, feed: false },
-    { id: "VULCAN", num: 0, name: "Vulcan", race: "Federation", x: 6053, y: 20747, dock: true, feed: false },
-    { id: "ROM", num: 0, name: "Romulus", race: "Romulan", x: 20100, y: 29200, dock: true, feed: false },
-    { id: "KLIN", num: 0, name: "Klinzhai", race: "Klingon", x: 36030, y: -18080, dock: true, feed: false },
-    { id: "GORN", num: 0, name: "Gorn", race: "Gorn", x: -10000, y: -36020, dock: true, feed: false },
-    { id: "ORION", num: 0, name: "Orion", race: "Orion", x: -39700, y: 16341, dock: true, feed: false },
-    { id: "VEGA", num: 0, name: "Delta Vega", race: "Planet", x: -20320, y: -21344, dock: false, feed: true },
-    { id: "DENEVA", num: 0, name: "Deneva", race: "Planet", x: -21200, y: -23040, dock: false, feed: true },
-    { id: "WRIGLEY", num: 0, name: "Wrigley", race: "Planet", x: 8100, y: -20341, dock: false, feed: true },
-    { id: "RIGEL", num: 0, name: "Rigel XII", race: "Planet", x: -17700, y: -9341, dock: false, feed: true },
-    { id: "ORGANIA", num: 0, name: "Organia", race: "Planet", x: -18000, y: 4000, dock: false, feed: false },
-    { id: "MUTARA", num: 0, name: "Mutara Nebula", race: "Hazard", x: -6003, y: -10300, dock: false, feed: false },
-    { id: "ROCKS", num: 0, name: "Asteroid Field", race: "Hazard", x: -18000, y: -12500, dock: false, feed: false },
-    { id: "THOLIAN", num: 0, name: "Tholean Space", race: "Hazard", x: -40003, y: 6032, dock: false, feed: false },
-  ],
-  "A",
-  { x: 3, y: -7 },
-);
+/** Original mtrek coordinates, scaled into world units. Z is the third axis. */
+export const SPOTS: Spot[] = CHART.map((row) => ({
+  id: row.id,
+  num: row.num,
+  name: row.name,
+  race: raceOf(row),
+  kind: row.kind,
+  x: row.x,
+  y: row.y,
+  z: row.z,
+  r: row.r,
+  quad: row.quad,
+  dock: row.dock,
+  feed: row.feed,
+}));
+export const BASES: Base[] = SPOTS.filter((spot) => spot.dock && spot.kind !== "hole");
+export const PLANETS: Planet[] = SPOTS.filter((spot) => !spot.dock && spot.kind !== "hole");
+export const HOLES: Spot[] = SPOTS.filter((spot) => spot.kind === "hole");
 
-layChart(
-  [
-    { id: "SB11", num: 11, name: "Starbase 11", race: "Starbase", x: 4016, y: 13407, dock: true, feed: false },
-    { id: "SB12", num: 12, name: "Starbase 12", race: "Starbase", x: 26200, y: 9680, dock: true, feed: false },
-    { id: "SB13", num: 13, name: "Starbase 13", race: "Starbase", x: 8150, y: -10940, dock: true, feed: false },
-    { id: "SB14", num: 14, name: "Starbase 14", race: "Starbase", x: 1340, y: -24700, dock: true, feed: false },
-    { id: "SB15", num: 15, name: "Starbase 15", race: "Starbase", x: -5900, y: -12870, dock: true, feed: false },
-    { id: "SB16", num: 16, name: "Starbase 16", race: "Starbase", x: -19792, y: -15170, dock: true, feed: false },
-    { id: "SB17", num: 17, name: "Starbase 17", race: "Starbase", x: -25935, y: 2440, dock: true, feed: false },
-    { id: "SB18", num: 18, name: "Starbase 18", race: "Starbase", x: -18913, y: 11802, dock: true, feed: false },
-    { id: "SB19", num: 19, name: "Starbase 19", race: "Starbase", x: -16402, y: 22795, dock: true, feed: false },
-    { id: "SB20", num: 20, name: "Starbase 20", race: "Starbase", x: 207, y: 26501, dock: true, feed: false },
-    { id: "DANA", num: 0, name: "Dana", race: "Planet", x: 1280, y: 24120, dock: true, feed: false },
-    { id: "MALIBU", num: 0, name: "Malibu Beta 6", race: "Planet", x: -23450, y: 27700, dock: true, feed: false },
-    { id: "ARRAKIS", num: 0, name: "Arrakis", race: "Planet", x: -15350, y: 2440, dock: false, feed: true },
-    { id: "PLEASURE", num: 0, name: "Pleasure Planet", race: "Planet", x: 28620, y: -15180, dock: false, feed: true },
-    { id: "HAWS", num: 0, name: "Hawserion", race: "Planet", x: -19340, y: -18190, dock: false, feed: true },
-    { id: "NEWT", num: 0, name: "Newtonium", race: "Planet", x: 2512, y: 5004, dock: false, feed: false },
-  ],
-  "B",
-  null,
-);
+export type Zone = { minX: number; maxX: number; minY: number; maxY: number };
+
+/** Shared by the long-range pane and chart clicks so a click lands where it looks. */
+export function zoneOf(quad: Quad): Zone {
+  const rows = SPOTS.filter((spot) => spot.quad === quad);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const spot of rows) {
+    minX = Math.min(minX, spot.x);
+    maxX = Math.max(maxX, spot.x);
+    minY = Math.min(minY, spot.y);
+    maxY = Math.max(maxY, spot.y);
+  }
+  if (!Number.isFinite(minX)) return { minX: 0, maxX: WORLD, minY: 0, maxY: WORLD };
+  const pad = 420;
+  return { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad };
+}
+
+const QUAD_ORDER: Quad[] = ["A", "B", "G", "O"];
+const QUAD_NAME: Record<Quad, "ALPHA" | "BETA" | "GAMMA" | "OMEGA"> = {
+  A: "ALPHA",
+  B: "BETA",
+  G: "GAMMA",
+  O: "OMEGA",
+};
+
+function nextQuad(q: Quad): Quad {
+  return QUAD_ORDER[(QUAD_ORDER.indexOf(q) + 1) % QUAD_ORDER.length];
+}
 
 const BOTS: { name: string; classId: string; bias: number; home: string; skill: number }[] = [
   { name: "IKS Torg", classId: "KEV12", bias: 0.72, home: "KLIN", skill: 5 },
@@ -345,6 +331,7 @@ function makeShip(
     home: string;
     x: number;
     y: number;
+    z: number;
     bias?: number;
     skill?: number;
   },
@@ -360,6 +347,7 @@ function makeShip(
     isPlayer: partial.isPlayer,
     x: partial.x,
     y: partial.y,
+    z: partial.z,
     yaw,
     warp: 0,
     hull: cls.hull,
@@ -403,6 +391,7 @@ function makeShip(
     aiState: "patrol",
     patrolX: partial.x,
     patrolY: partial.y,
+    patrolZ: partial.z,
     orbitSign: Math.random() < 0.5 ? -1 : 1,
     bias: partial.bias ?? 0,
     home: partial.home,
@@ -410,6 +399,7 @@ function makeShip(
     born: t,
     goalYaw: yaw,
     goalWarp: 0,
+    goalZ: partial.z,
     missNote: 0,
     crystals: cls.crystals ?? 0,
     remote: false,
@@ -445,6 +435,7 @@ export class TrekSim {
   inputOverride: Set<string> | null = null;
   touchSteer = 0;
   touchWarp = 0;
+  touchClimb = 0;
   touchPhaser = false;
   touchTorp = false;
   touchDrone = false;
@@ -456,7 +447,7 @@ export class TrekSim {
   /** 7 flies the human ship with the same brain the robots use. 7 again takes the helm back. */
   aiPilot = false;
   /** Click on the long-range chart. The ship flies to this point. */
-  nav: { x: number; y: number } | null = null;
+  nav: { x: number; y: number; z: number } | null = null;
   private threatId: string | null = null;
   private threatUntil = 0;
   /** mtrek.com wormholes sit dark for about a minute, then open again. */
@@ -484,6 +475,7 @@ export class TrekSim {
         home: home.id,
         x: home.x + 460,
         y: home.y + 280,
+        z: home.z,
       },
       0,
     );
@@ -501,8 +493,9 @@ export class TrekSim {
             letter: letters[i] ?? "z",
             isPlayer: false,
             home: bot.home,
-            x: clamp(b.x + Math.cos(ang) * 520, 200, WORLD - 200),
-            y: clamp(b.y + Math.sin(ang) * 520, 200, WORLD - 200),
+            x: b.x + Math.cos(ang) * 520,
+            y: b.y + Math.sin(ang) * 520,
+            z: b.z,
             bias: bot.bias,
             skill: bot.skill,
           },
@@ -537,7 +530,7 @@ export class TrekSim {
     else if (cls.esi) this.say("Expanding-sphere phasers hit every ship in range. A crowd weakens the shot.", "info");
     else if ((cls.crystals ?? 0) >= 60)
       this.say("Dilithium soaks hits that punch the shields. Dock to refill the crystals.", "info");
-    else this.say("W/S warp · A/D turn · click a ship to lock · Space phasers · T torpedoes · . dock", "info");
+    else this.say("W/S warp · Up/Down change Z · A/D turn · click a ship to lock · Space phasers · T torpedoes · . dock", "info");
   }
 
   held() {
@@ -580,8 +573,8 @@ export class TrekSim {
     return BASES.find((b) => b.id === id) ?? BASES[0];
   }
 
-  dist(ax: number, ay: number, bx: number, by: number) {
-    return Math.hypot(ax - bx, ay - by);
+  dist(ax: number, ay: number, bx: number, by: number, az = 0, bz = 0) {
+    return Math.hypot(ax - bx, ay - by, az - bz);
   }
 
   shipById(id: string | null) {
@@ -602,7 +595,8 @@ export class TrekSim {
       hull?: number;
       cloaked?: boolean;
       docked?: boolean;
-      quad?: "A" | "B";
+      quad?: Quad;
+      z?: number;
       alive?: boolean;
     },
   ) {
@@ -618,8 +612,9 @@ export class TrekSim {
       }
       return;
     }
-    const x = clamp(Number(pose.x) || 0, 80, WORLD - 80);
-    const y = clamp(Number(pose.y) || 0, 80, WORLD - 80);
+    const x = Number(pose.x) || 0;
+    const y = Number(pose.y) || 0;
+    const z = Number.isFinite(Number(pose.z)) ? Number(pose.z) : 4500;
     if (!ship) {
       const letters = "bcdefghij";
       const used = new Set(this.ships.map((s) => s.letter));
@@ -633,22 +628,24 @@ export class TrekSim {
           home: "SB1",
           x,
           y,
+          z,
         },
         this.t,
       );
       ship.id = id;
       ship.remote = true;
-      ship.quad = pose.quad === "B" ? "B" : "A";
+      ship.quad = pose.quad && QUAD_ORDER.includes(pose.quad) ? pose.quad : "A";
       this.ships.push(ship);
       this.say(`${ship.name} entered the quadrant.`, "amber");
     }
     ship.remote = true;
-    ship.quad = pose.quad === "B" ? "B" : "A";
+    ship.quad = pose.quad && QUAD_ORDER.includes(pose.quad) ? pose.quad : ship.quad;
     ship.alive = true;
     ship.name = String(pose.name ?? ship.name).slice(0, 18);
     if (pose.classId && pose.classId !== ship.cls.id) ship.cls = classById(String(pose.classId));
     ship.x = x;
     ship.y = y;
+    ship.z = z;
     ship.yaw = Number(pose.yaw) || 0;
     ship.warp = clamp(Number(pose.warp) || 0, 0, 18);
     ship.shield = clamp(Number(pose.shield) || 0, 0, 100);
@@ -700,7 +697,7 @@ export class TrekSim {
     if (!target.alive) return false;
     if (observer.quad === target.quad && target.remote) return true;
     if (observer.quad !== target.quad) return false;
-    const d = this.dist(observer.x, observer.y, target.x, target.y);
+    const d = this.dist(observer.x, observer.y, target.x, target.y, observer.z, target.z);
     if (d > observer.cls.scan) return false;
     if (target.cloaked && !target.docked && d > 320 && target !== observer) return false;
     return true;
@@ -792,7 +789,7 @@ export class TrekSim {
       let best = Infinity;
       for (const s of this.ships) {
         if (s === p || !s.alive || s.docked || !this.visible(p, s)) continue;
-        const d = this.dist(p.x, p.y, s.x, s.y);
+        const d = this.dist(p.x, p.y, s.x, s.y, p.z, s.z);
         if (d < best) {
           best = d;
           pick = s;
@@ -808,8 +805,8 @@ export class TrekSim {
     const threat = pick.id === this.threatId && this.t < this.threatUntil;
     const aimed = this.bolts.some((b) => b.owner === pick.id && b.lockId === p.id);
     if (cur && cur.alive && !cur.docked && this.visible(p, cur) && !threat && !aimed) {
-      const cd = this.dist(p.x, p.y, cur.x, cur.y);
-      const pd = this.dist(p.x, p.y, pick.x, pick.y);
+      const cd = this.dist(p.x, p.y, cur.x, cur.y, p.z, cur.z);
+      const pd = this.dist(p.x, p.y, pick.x, pick.y, p.z, pick.z);
       if (pd > cd * 0.85) return;
     }
     p.lockId = pick.id;
@@ -825,9 +822,26 @@ export class TrekSim {
   }
 
   /** Fly to a point chosen on the long-range chart. */
-  setWaypoint(x: number, y: number) {
+  setWaypoint(x: number, y: number, z?: number) {
     if (this.over || this.player.docked || !this.player.alive) return;
-    this.nav = { x: clamp(x, 80, WORLD - 80), y: clamp(y, 80, WORLD - 80) };
+    const zone = zoneOf(this.player.quad);
+    let px = clamp(x, zone.minX, zone.maxX);
+    let py = clamp(y, zone.minY, zone.maxY);
+    let pz = z ?? this.player.z;
+    if (z === undefined) {
+      let best = 90;
+      for (const spot of SPOTS) {
+        if (spot.quad !== this.player.quad) continue;
+        const dxy = Math.hypot(spot.x - px, spot.y - py);
+        if (dxy < Math.max(best, spot.r)) {
+          best = dxy;
+          px = spot.x;
+          py = spot.y;
+          pz = spot.z;
+        }
+      }
+    }
+    this.nav = { x: px, y: py, z: pz };
     this.player.courseYaw = null;
     this.player.intercept = false;
     this.seekBase = false;
@@ -897,7 +911,7 @@ export class TrekSim {
     const p = this.player;
     if (p.docked || this.over) return;
     const base = this.nearestBase(p);
-    const d = this.dist(p.x, p.y, base.x, base.y);
+    const d = this.dist(p.x, p.y, base.x, base.y, p.z, base.z);
     if (d > 110) {
       this.say(`${base.name} is ${Math.round(d)} out. Close to 100 and kill warp.`, "info");
       return;
@@ -981,7 +995,7 @@ export class TrekSim {
     let best = bases[0] ?? BASES[0];
     let bestD = Infinity;
     for (const b of bases) {
-      const d = this.dist(ship.x, ship.y, b.x, b.y);
+      const d = this.dist(ship.x, ship.y, b.x, b.y, ship.z, b.z);
       if (d < bestD) {
         bestD = d;
         best = b;
@@ -994,7 +1008,7 @@ export class TrekSim {
     let best: Ship | null = null;
     let bestD = Infinity;
     for (const o of list) {
-      const d = this.dist(ship.x, ship.y, o.x, o.y);
+      const d = this.dist(ship.x, ship.y, o.x, o.y, ship.z, o.z);
       if (d < bestD) {
         bestD = d;
         best = o;
@@ -1012,10 +1026,11 @@ export class TrekSim {
     }
     this.steerToward(ship, ship.goalYaw, dt * 0.25);
     this.easeWarp(ship, ship.goalWarp, dt * 0.25);
+    this.easeZ(ship, ship.goalZ, dt * 0.25);
     if (ship.aiState === "hunt") {
       const tgt = this.shipById(ship.lockId);
       if (tgt && tgt.alive && tgt !== ship && !tgt.docked) {
-        const d = this.dist(ship.x, ship.y, tgt.x, tgt.y);
+        const d = this.dist(ship.x, ship.y, tgt.x, tgt.y, ship.z, tgt.z);
         const noseOn = Math.abs(angDiff(ship.yaw, yawTo(ship.x, ship.y, tgt.x, tgt.y))) < 0.55;
         if (noseOn && d < ship.cls.phaserRange * 0.96) this.firePhaser(ship);
         if (noseOn && d > ship.cls.torpMin * 0.85 && d < ship.cls.torpMax * 0.95) this.fireTorp(ship);
@@ -1025,7 +1040,7 @@ export class TrekSim {
     }
     if (ship.aiState === "docking") {
       const base = this.nearestBase(ship);
-      if (this.dist(ship.x, ship.y, base.x, base.y) < 96 && ship.warp < 1.6) this.doDock(ship, base);
+      if (this.dist(ship.x, ship.y, base.x, base.y, ship.z, base.z) < 96 && ship.warp < 1.6) this.doDock(ship, base);
     }
   }
 
@@ -1034,11 +1049,13 @@ export class TrekSim {
       ship.aiState = "patrol";
       ship.lockId = null;
       ship.cloaked = false;
-      if (this.dist(ship.x, ship.y, ship.patrolX, ship.patrolY) < 220) {
+      if (this.dist(ship.x, ship.y, ship.patrolX, ship.patrolY, ship.z, ship.patrolZ) < 220) {
         ship.patrolX = 700 + Math.random() * (WORLD - 1400);
         ship.patrolY = 700 + Math.random() * (WORLD - 1400);
+        ship.patrolZ = ship.z + (Math.random() - 0.5) * 800;
       }
       ship.goalYaw = yawTo(ship.x, ship.y, ship.patrolX, ship.patrolY);
+      ship.goalZ = ship.patrolZ;
       ship.goalWarp = ship.cls.cruise * 0.4;
       return;
     }
@@ -1049,8 +1066,9 @@ export class TrekSim {
       ship.hull / ship.cls.hull < 0.26 || ship.energy < 24 || (ship.magazine === 0 && ship.energy < 50);
     if (hurt) {
       const base = this.nearestBase(ship);
-      const d = this.dist(ship.x, ship.y, base.x, base.y);
+      const d = this.dist(ship.x, ship.y, base.x, base.y, ship.z, base.z);
       ship.goalYaw = yawTo(ship.x, ship.y, base.x, base.y);
+      ship.goalZ = base.z;
       ship.goalWarp = d > 180 ? Math.min(ship.cls.cruise, ship.cls.maxWarp) : 1;
       ship.aiState = d < 100 ? "docking" : "flee";
       ship.lockId = null;
@@ -1064,7 +1082,7 @@ export class TrekSim {
       const shooting =
         o.lockId === ship.id || this.bolts.some((b) => b.owner === o.id && b.lockId === ship.id);
       if (!shooting) continue;
-      const d = this.dist(ship.x, ship.y, o.x, o.y);
+      const d = this.dist(ship.x, ship.y, o.x, o.y, ship.z, o.z);
       if (d < shooterD) {
         shooter = o;
         shooterD = d;
@@ -1078,8 +1096,8 @@ export class TrekSim {
       this.visible(ship, this.player) &&
       Math.random() < ship.bias * 0.35
     ) {
-      const playerDist = this.dist(ship.x, ship.y, this.player.x, this.player.y);
-      const nearDist = target ? this.dist(ship.x, ship.y, target.x, target.y) : Infinity;
+      const playerDist = this.dist(ship.x, ship.y, this.player.x, this.player.y, ship.z, this.player.z);
+      const nearDist = target ? this.dist(ship.x, ship.y, target.x, target.y, ship.z, target.z) : Infinity;
       if (playerDist < nearDist * 1.35) target = this.player;
     }
     const heldLock = this.shipById(ship.lockId);
@@ -1091,25 +1109,28 @@ export class TrekSim {
       !heldLock.docked &&
       this.visible(ship, heldLock)
     ) {
-      const heldDist = this.dist(ship.x, ship.y, heldLock.x, heldLock.y);
-      const nextDist = target ? this.dist(ship.x, ship.y, target.x, target.y) : Infinity;
+      const heldDist = this.dist(ship.x, ship.y, heldLock.x, heldLock.y, ship.z, heldLock.z);
+      const nextDist = target ? this.dist(ship.x, ship.y, target.x, target.y, ship.z, target.z) : Infinity;
       if (heldDist < nextDist * 1.4) target = heldLock;
     }
     if (!target) {
       ship.aiState = "patrol";
       ship.lockId = null;
       ship.cloaked = false;
-      if (this.dist(ship.x, ship.y, ship.patrolX, ship.patrolY) < 220) {
+      if (this.dist(ship.x, ship.y, ship.patrolX, ship.patrolY, ship.z, ship.patrolZ) < 220) {
         ship.patrolX = 700 + Math.random() * (WORLD - 1400);
         ship.patrolY = 700 + Math.random() * (WORLD - 1400);
+        ship.patrolZ = ship.z + (Math.random() - 0.5) * 800;
       }
       ship.goalYaw = yawTo(ship.x, ship.y, ship.patrolX, ship.patrolY);
+      ship.goalZ = ship.patrolZ;
       ship.goalWarp = ship.cls.cruise * 0.55;
       return;
     }
     ship.aiState = "hunt";
     ship.lockId = target.id;
-    const d = this.dist(ship.x, ship.y, target.x, target.y);
+    ship.goalZ = target.z;
+    const d = this.dist(ship.x, ship.y, target.x, target.y, ship.z, target.z);
     const bearing = yawTo(ship.x, ship.y, target.x, target.y);
     const optimal = ship.cls.phaserRange * 0.72;
     let offset = 0;
@@ -1150,9 +1171,10 @@ export class TrekSim {
     ship.x += dir.x * spd * dt;
     ship.y += dir.y * spd * dt;
     ship.traveled += spd * dt;
-    if (ship.x < 70 || ship.x > WORLD - 70 || ship.y < 70 || ship.y > WORLD - 70) {
-      ship.x = clamp(ship.x, 70, WORLD - 70);
-      ship.y = clamp(ship.y, 70, WORLD - 70);
+    const zone = zoneOf(ship.quad);
+    if (ship.x < zone.minX || ship.x > zone.maxX || ship.y < zone.minY || ship.y > zone.maxY) {
+      ship.x = clamp(ship.x, zone.minX, zone.maxX);
+      ship.y = clamp(ship.y, zone.minY, zone.maxY);
       ship.yaw = yawTo(ship.x, ship.y, WORLD / 2, WORLD / 2);
       ship.courseYaw = null;
       ship.warp = Math.min(ship.warp, 2);
@@ -1161,6 +1183,13 @@ export class TrekSim {
         this.say("Nav hazard — quadrant edge. Coming about.", "alert");
       }
     }
+  }
+
+  private easeZ(ship: Ship, target: number, dt: number) {
+    const diff = target - ship.z;
+    const step = CLIMB * dt;
+    if (Math.abs(diff) <= step) ship.z = target;
+    else ship.z += Math.sign(diff) * step;
   }
 
   private easeWarp(ship: Ship, target: number, dt: number) {
@@ -1182,12 +1211,12 @@ export class TrekSim {
     const range = ship.cls.phaserRange;
     const foes = this.ships.filter((o) => o !== ship && o.alive && !o.docked);
     if (ship.cls.esi) {
-      const hits = foes.filter((o) => this.dist(ship.x, ship.y, o.x, o.y) <= range && (!o.cloaked || this.dist(ship.x, ship.y, o.x, o.y) < 300));
+      const hits = foes.filter((o) => this.dist(ship.x, ship.y, o.x, o.y, ship.z, o.z) <= range && (!o.cloaked || this.dist(ship.x, ship.y, o.x, o.y, ship.z, o.z) < 300));
       if (hits.length === 0) return false;
       ship.energy -= 16;
       ship.phaserCd = 1.7;
       for (const o of hits) {
-        const d = this.dist(ship.x, ship.y, o.x, o.y);
+        const d = this.dist(ship.x, ship.y, o.x, o.y, ship.z, o.z);
         const fall = clamp(1 - d / range, 0, 1);
         const dmg = (ship.cls.phaser / hits.length) * (0.4 + 0.6 * fall);
         this.applyDamage(o, dmg, ship);
@@ -1204,14 +1233,14 @@ export class TrekSim {
       lock.alive &&
       !lock.docked &&
       lock !== ship &&
-      this.dist(ship.x, ship.y, lock.x, lock.y) <= range &&
-      (!lock.cloaked || this.dist(ship.x, ship.y, lock.x, lock.y) < 300)
+      this.dist(ship.x, ship.y, lock.x, lock.y, ship.z, lock.z) <= range &&
+      (!lock.cloaked || this.dist(ship.x, ship.y, lock.x, lock.y, ship.z, lock.z) < 300)
     ) {
       victim = lock;
     } else {
       let best = Infinity;
       for (const o of foes) {
-        const d = this.dist(ship.x, ship.y, o.x, o.y);
+        const d = this.dist(ship.x, ship.y, o.x, o.y, ship.z, o.z);
         if (d > range) continue;
         if (o.cloaked && d > 300) continue;
         const bearing = yawTo(ship.x, ship.y, o.x, o.y);
@@ -1224,7 +1253,7 @@ export class TrekSim {
       }
     }
     if (!victim) return false;
-    const d = this.dist(ship.x, ship.y, victim.x, victim.y);
+    const d = this.dist(ship.x, ship.y, victim.x, victim.y, ship.z, victim.z);
     const fall = clamp(1 - d / range, 0, 1);
     let dmg = ship.cls.phaser * (0.22 + 0.78 * fall);
     if (wide) dmg *= 0.55;
@@ -1263,18 +1292,22 @@ export class TrekSim {
     const lock = this.shipById(ship.lockId);
     let dirx: number;
     let diry: number;
+    let dirz: number;
     let lockId: string | null = null;
-    if (lock && lock.alive && !lock.docked && (!lock.cloaked || this.dist(ship.x, ship.y, lock.x, lock.y) < 340)) {
+    if (lock && lock.alive && !lock.docked && (!lock.cloaked || this.dist(ship.x, ship.y, lock.x, lock.y, ship.z, lock.z) < 340)) {
       const dx = lock.x - ship.x;
       const dy = lock.y - ship.y;
-      const len = Math.hypot(dx, dy) || 1;
+      const dz = lock.z - ship.z;
+      const len = Math.hypot(dx, dy, dz) || 1;
       dirx = dx / len;
       diry = dy / len;
+      dirz = dz / len;
       lockId = lock.id;
     } else {
       const n = nose(ship.yaw);
       dirx = n.x;
       diry = n.y;
+      dirz = 0;
     }
     ship.magazine -= 1;
     ship.torpCd = ship.cls.torpCd;
@@ -1283,8 +1316,10 @@ export class TrekSim {
     this.bolts.push({
       x: ship.x + dirx * 46,
       y: ship.y + diry * 46,
+      z: ship.z + dirz * 46,
       vx: dirx * spd,
       vy: diry * spd,
+      vz: dirz * spd,
       dmg: ship.cls.torpDmg,
       owner: ship.id,
       traveled: 0,
@@ -1308,6 +1343,7 @@ export class TrekSim {
     this.mines.push({
       x: ship.x,
       y: ship.y,
+      z: ship.z,
       dmg: ship.cls.mineDmg ?? 170,
       owner: ship.id,
       life: 48,
@@ -1323,18 +1359,22 @@ export class TrekSim {
     const lock = this.shipById(ship.lockId);
     let dirx: number;
     let diry: number;
+    let dirz: number;
     let lockId: string | null = null;
     if (lock && lock.alive && !lock.docked) {
       const dx = lock.x - ship.x;
       const dy = lock.y - ship.y;
-      const len = Math.hypot(dx, dy) || 1;
+      const dz = lock.z - ship.z;
+      const len = Math.hypot(dx, dy, dz) || 1;
       dirx = dx / len;
       diry = dy / len;
+      dirz = dz / len;
       lockId = lock.id;
     } else {
       const n = nose(ship.yaw);
       dirx = n.x;
       diry = n.y;
+      dirz = 0;
     }
     ship.drones -= 1;
     ship.droneCd = 1.7;
@@ -1343,8 +1383,10 @@ export class TrekSim {
     this.bolts.push({
       x: ship.x + dirx * 40,
       y: ship.y + diry * 40,
+      z: ship.z + dirz * 40,
       vx: dirx * spd,
       vy: diry * spd,
+      vz: dirz * spd,
       dmg: ship.cls.droneDmg ?? 90,
       owner: ship.id,
       traveled: 0,
@@ -1426,7 +1468,7 @@ export class TrekSim {
           ? 40
           : 0
         : Math.min(1000, aboard) + Math.floor(Math.max(0, aboard - 1000) * 0.1);
-    if (dropped > 0) this.picks.push({ x: ship.x, y: ship.y, gold: dropped, life: 90 });
+    if (dropped > 0) this.picks.push({ x: ship.x, y: ship.y, z: ship.z, gold: dropped, life: 90 });
     this.clearAboard(ship);
     const by = killer && killer !== ship ? killer.name : "a hazard";
     this.say(`${ship.name} destroyed by ${by}.`, "alert");
@@ -1477,6 +1519,8 @@ export class TrekSim {
           ship.alive = true;
           ship.x = base.x + 180;
           ship.y = base.y + 120;
+          ship.z = base.z;
+          ship.quad = base.quad;
           ship.hull = ship.cls.hull;
           ship.shield = 70;
           ship.energy = ship.cls.energy;
@@ -1539,7 +1583,7 @@ export class TrekSim {
       if (!ship.docked) {
         for (const planet of PLANETS) {
           if (planet.quad !== ship.quad || !planet.feed) continue;
-          if (this.dist(ship.x, ship.y, planet.x, planet.y) < 150) {
+          if (this.dist(ship.x, ship.y, planet.x, planet.y, ship.z, planet.z) < Math.max(150, planet.r)) {
             ship.energy = Math.min(ship.cls.energy, ship.energy + 7 * dt);
           }
         }
@@ -1575,12 +1619,10 @@ export class TrekSim {
       if (held.has("KeyA") || held.has("ArrowLeft")) steer += 1;
       if (held.has("KeyD") || held.has("ArrowRight")) steer -= 1;
       steer = clamp(steer + this.touchSteer, -1, 1);
-      const warpUp = this.touchWarp > 0 || ((held.has("KeyW") || held.has("ArrowUp")) && !shift);
-      const warpDn =
-        this.touchWarp < 0 ||
-        held.has("KeyS") ||
-        held.has("ArrowDown") ||
-        ((held.has("KeyW") || held.has("ArrowUp")) && shift);
+      const warpUp = this.touchWarp > 0 || (held.has("KeyW") && !shift);
+      const warpDn = this.touchWarp < 0 || held.has("KeyS") || (held.has("KeyW") && shift);
+      const climb =
+        (held.has("ArrowUp") ? 1 : 0) - (held.has("ArrowDown") ? 1 : 0) + this.touchClimb;
       if (warpUp || warpDn) {
         p.intercept = false;
         this.seekBase = false;
@@ -1601,27 +1643,30 @@ export class TrekSim {
         const lock = this.shipById(p.lockId);
         if (lock && lock.alive && this.visible(p, lock)) {
           this.steerToward(p, yawTo(p.x, p.y, lock.x, lock.y), dt);
-          const d = this.dist(p.x, p.y, lock.x, lock.y);
+          const d = this.dist(p.x, p.y, lock.x, lock.y, p.z, lock.z);
           const want = d > 900 ? p.cls.cruise : d > 280 ? 3.5 : 0.6;
           this.easeWarp(p, want, dt);
+          if (climb === 0) this.easeZ(p, lock.z, dt);
         } else {
           p.intercept = false;
         }
       } else if (this.seekBase && p.twLeft <= 0) {
         const base = this.nearestBase(p);
-        const d = this.dist(p.x, p.y, base.x, base.y);
+        const d = this.dist(p.x, p.y, base.x, base.y, p.z, base.z);
         this.steerToward(p, yawTo(p.x, p.y, base.x, base.y), dt);
         const want = d > 900 ? p.cls.cruise : d > 220 ? 3.2 : 0.7;
         this.easeWarp(p, want, dt);
+        if (climb === 0) this.easeZ(p, base.z, dt);
         if (d < 100 && p.warp <= 1.4) {
           this.seekBase = false;
           this.doDock(p, base);
         }
       } else if (this.nav && p.twLeft <= 0) {
-        const d = this.dist(p.x, p.y, this.nav.x, this.nav.y);
+        const d = this.dist(p.x, p.y, this.nav.x, this.nav.y, p.z, this.nav.z);
         this.steerToward(p, yawTo(p.x, p.y, this.nav.x, this.nav.y), dt);
         const want = d > 800 ? p.cls.cruise : d > 240 ? 3 : 0.5;
         this.easeWarp(p, want, dt);
+        if (climb === 0) this.easeZ(p, this.nav.z, dt);
         if (d < 90) {
           this.nav = null;
           this.say("On station.", "info");
@@ -1634,6 +1679,7 @@ export class TrekSim {
         if (warpUp && p.energy >= 8) p.warp = Math.min(p.cls.maxWarp, p.warp + WARP_ACCEL * dt);
         if (warpDn) p.warp = Math.max(-2, p.warp - WARP_ACCEL * dt);
       }
+      if (climb !== 0 && p.twLeft <= 0) p.z += climb * CLIMB * dt;
       if ((held.has("Space") || held.has("KeyF") || held.has("KeyP") || this.touchPhaser) && p.phaserCd <= 0) {
         if (p.cls.agonizer && p.magazine <= 0) {
           if (this.t > p.missNote) {
@@ -1686,7 +1732,7 @@ export class TrekSim {
       if (mine.arm <= 0 && !boom) {
         for (const ship of this.ships) {
           if (!ship.alive || ship.docked) continue;
-          if (this.dist(mine.x, mine.y, ship.x, ship.y) < 46) {
+          if (this.dist(mine.x, mine.y, ship.x, ship.y, mine.z, ship.z) < 46) {
             this.applyDamage(ship, mine.dmg, this.shipById(mine.owner));
             this.burst(mine.x, mine.y, 10, true);
             if (ship.isPlayer) this.say("Mine.", "alert");
@@ -1708,7 +1754,7 @@ export class TrekSim {
     for (const ship of this.ships) {
       if (!ship.alive || ship.docked || ship.holeCd > 0 || ship.remote) continue;
       const here = HOLES.find((h) => h.quad === ship.quad);
-        if (!here || this.dist(ship.x, ship.y, here.x, here.y) >= 78) continue;
+        if (!here || this.dist(ship.x, ship.y, here.x, here.y, ship.z, here.z) >= Math.max(78, here.r)) continue;
         if (ship.cloaked) {
           if (ship.isPlayer && this.t > this.edgeNote) {
             this.edgeNote = this.t + 3;
@@ -1723,17 +1769,16 @@ export class TrekSim {
           }
           continue;
         }
-        const there = HOLES.find((h) => h.quad !== ship.quad) ?? here;
+        const there = HOLES.find((h) => h.quad === nextQuad(ship.quad)) ?? here;
         const n = nose(ship.yaw);
         ship.quad = there.quad;
         ship.x = there.x + n.x * 160;
         ship.y = there.y + n.y * 160;
+        ship.z = there.z;
         ship.holeCd = 60;
         if (ship.isPlayer) {
           this.say(
-            ship.quad === "B"
-              ? "Wormhole transit. Beta quadrant. A minute before this mouth will take you again."
-              : "Wormhole transit. Alpha quadrant. A minute before this mouth will take you again.",
+            `Wormhole transit. ${QUAD_NAME[ship.quad]} quadrant. A minute before this mouth will take you again.`,
             "amber",
           );
         }
@@ -1745,25 +1790,29 @@ export class TrekSim {
       if (lock && lock.alive && !lock.docked && b.homing > 0) {
         const dx = lock.x - b.x;
         const dy = lock.y - b.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const spd = Math.hypot(b.vx, b.vy) || 1;
+        const dz = lock.z - b.z;
+        const len = Math.hypot(dx, dy, dz) || 1;
+        const spd = Math.hypot(b.vx, b.vy, b.vz) || 1;
         const tx = (dx / len) * spd;
         const ty = (dy / len) * spd;
+        const tz = (dz / len) * spd;
         const k = clamp(b.homing * dt, 0, 1);
         b.vx += (tx - b.vx) * k;
         b.vy += (ty - b.vy) * k;
+        b.vz += (tz - b.vz) * k;
       }
-      const step = Math.hypot(b.vx, b.vy) * dt;
+      const step = Math.hypot(b.vx, b.vy, b.vz) * dt;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
+      b.z += b.vz * dt;
       b.traveled += step;
       b.life -= dt;
       let hit = false;
       if (b.traveled >= b.min) {
         for (const ship of this.ships) {
           if (!ship.alive || ship.docked || ship.id === b.owner) continue;
-          if (ship.cloaked && this.dist(b.x, b.y, ship.x, ship.y) > 36) continue;
-          if (this.dist(b.x, b.y, ship.x, ship.y) < 34) {
+          if (ship.cloaked && this.dist(b.x, b.y, ship.x, ship.y, b.z, ship.z) > 36) continue;
+          if (this.dist(b.x, b.y, ship.x, ship.y, b.z, ship.z) < 34) {
             const span = Math.max(1, b.max - b.min);
             const u = clamp((b.traveled - b.min) / span, 0, 1);
             const dmg =
@@ -1775,7 +1824,7 @@ export class TrekSim {
           }
         }
       }
-      if (hit || b.life <= 0 || b.traveled > b.max || b.x < -200 || b.y < -200 || b.x > WORLD + 200 || b.y > WORLD + 200) {
+      if (hit || b.life <= 0 || b.traveled > b.max) {
         this.bolts.splice(i, 1);
       }
     }
@@ -1787,7 +1836,7 @@ export class TrekSim {
       let taken = false;
       for (const ship of seekers) {
         if (!ship.alive || ship.docked || ship.remote) continue;
-        if (this.dist(ship.x, ship.y, g.x, g.y) < 56) {
+        if (this.dist(ship.x, ship.y, g.x, g.y, ship.z, g.z) < 56) {
           ship.cargo += g.gold;
           if (ship.isPlayer) {
             this.say(`Picked up ${g.gold} gold. Dock to keep it.`, "amber");
@@ -1819,6 +1868,8 @@ export class TrekSim {
     p.alive = true;
     p.x = base.x + 460;
     p.y = base.y + 280;
+    p.z = base.z;
+    p.quad = base.quad;
     p.yaw = yawTo(p.x, p.y, WORLD / 2, WORLD / 2);
     p.warp = 0;
     p.hull = p.cls.hull;
@@ -1857,7 +1908,7 @@ export class TrekSim {
         name: lock.name,
         code: lock.cls.code,
         race: lock.cls.race,
-        dist: this.dist(p.x, p.y, lock.x, lock.y),
+        dist: this.dist(p.x, p.y, lock.x, lock.y, p.z, lock.z),
         warp: lock.warp,
         shield: lock.shield,
         hull: Math.max(0, lock.hull),
@@ -1877,7 +1928,7 @@ export class TrekSim {
         letter: s.letter,
         name: s.remote && !same ? `${s.name} · other quadrant` : s.name,
         code: s.cls.code,
-        dist: seen && s.alive && same ? this.dist(p.x, p.y, s.x, s.y) : null,
+        dist: seen && s.alive && same ? this.dist(p.x, p.y, s.x, s.y, p.z, s.z) : null,
         alive: s.alive,
         docked: s.docked,
         isPlayer: s.isPlayer,
@@ -1886,11 +1937,11 @@ export class TrekSim {
       };
     });
     const base = this.nearestBase(p);
-    const bd = this.dist(p.x, p.y, base.x, base.y);
+    const bd = this.dist(p.x, p.y, base.x, base.y, p.z, base.z);
     let nearPlanet: string | null = null;
     for (const planet of PLANETS) {
       if (planet.quad !== p.quad) continue;
-      if (this.dist(p.x, p.y, planet.x, planet.y) < 150) nearPlanet = planet.name;
+      if (this.dist(p.x, p.y, planet.x, planet.y, p.z, planet.z) < 150) nearPlanet = planet.name;
     }
     let hint = "Click a contact or empty space.";
     if (this.over) hint = "Ship lost.";
@@ -1906,6 +1957,7 @@ export class TrekSim {
       warp: p.warp,
       maxWarp: p.cls.maxWarp,
       heading: headingOf(p.yaw),
+      z: p.z,
       energy: p.energy,
       energyMax: p.cls.energy,
       shield: p.shield,
@@ -1921,7 +1973,7 @@ export class TrekSim {
       crystals: p.crystals,
       crystalsMax: p.cls.crystals ?? 0,
       holeOpen: this.holeOpen,
-      quad: p.quad === "B" ? "BETA" : "ALPHA",
+      quad: QUAD_NAME[p.quad],
       cloakOn: p.cloaked,
       canCloak: p.cls.cloak,
       repair: p.repair,

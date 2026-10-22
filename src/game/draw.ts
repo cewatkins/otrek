@@ -1,4 +1,4 @@
-import { BASES, HOLES, PLANETS, WORLD, type TrekSim } from "@/game/sim";
+import { BASES, HOLES, PLANETS, zoneOf, type TrekSim } from "@/game/sim";
 
 const BG = "#000000";
 const FG = "#e6eef6";
@@ -69,8 +69,20 @@ const BODY_BY_NAME: Record<string, string> = {
   Newtonium: "mercury",
 };
 
+const BODY_HASH = ["earth", "mars", "jupiter", "neptune", "venus", "mercury", "europa", "io", "moon", "ceres", "saturn"];
+
 function bodyKey(name: string) {
-  return BODY_BY_NAME[name] ?? "starbase";
+  const known = BODY_BY_NAME[name];
+  if (known) return known;
+  const n = name.toLowerCase();
+  if (n.includes("nebula") || n.includes("tholian") || n.includes("tholean")) return n.includes("thol") ? "carina" : "nebula";
+  if (n.includes("asteroid") || n.includes("field")) return "ceres";
+  if (n.includes("starbase") || n.includes("k-7") || n.includes("babylon") || n.includes("outpost")) return "starbase";
+  if (n.includes("comet")) return "europa";
+  if (n.includes("cygnus") || n.includes("pulsar") || n.includes("quasar") || n.includes("star")) return "mercury";
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 33 + name.charCodeAt(i)) >>> 0;
+  return BODY_HASH[h % BODY_HASH.length];
 }
 
 function bodySprite(key: string): HTMLImageElement | null {
@@ -347,41 +359,48 @@ export function drawTactical(
   if (hole) {
     const p = toScreen(cam, hole.x, hole.y);
     const open = sim.holeOpen;
+    const mouthR = Math.max(10, hole.r * cam.scale * 2);
     ctx.strokeStyle = open ? AMBER : MUTED;
     ctx.globalAlpha = open ? 0.85 : 0.35;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 18, sim.t * (open ? 1.4 : 0.2), sim.t * (open ? 1.4 : 0.2) + 4);
+    ctx.arc(p.x, p.y, mouthR, sim.t * (open ? 1.4 : 0.2), sim.t * (open ? 1.4 : 0.2) + 4);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 10, -sim.t * 2, -sim.t * 2 + 3);
+    ctx.arc(p.x, p.y, mouthR * 0.55, -sim.t * 2, -sim.t * 2 + 3);
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.fillStyle = open ? MUTED : LINE;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-    const mouth = quad === "A" ? "ALPHA WORMHOLE" : "BETA WORMHOLE";
-    ctx.fillText(open ? mouth : "WORMHOLE DARK", p.x + 22, p.y + 4);
+    const names: Record<string, string> = { A: "ALPHA", B: "BETA", G: "GAMMA", O: "OMEGA" };
+    const mouth = `${names[quad] ?? "ALPHA"} WORMHOLE`;
+    ctx.fillText(open ? mouth : "WORMHOLE DARK", p.x + mouthR + 6, p.y + 4);
   }
 
   for (const planet of planets) {
     const p = toScreen(cam, planet.x, planet.y);
+    if (p.x < -180 || p.y < -180 || p.x > w + 180 || p.y > h + 180) continue;
     const key = bodyKey(planet.name);
-    const size = key === "nebula" || key === "carina" ? 64 : 40;
+    const size = Math.max(8, planet.r * cam.scale * 2);
     paintBody(ctx, key, p.x, p.y, size);
-    ctx.fillStyle = FG;
-    ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(planet.name, p.x + size * 0.55, p.y + 4);
+    if (size > 14) {
+      ctx.fillStyle = FG;
+      ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText(planet.name, p.x + size * 0.55, p.y + 4);
+    }
   }
 
   for (const base of bases) {
     const p = toScreen(cam, base.x, base.y);
+    if (p.x < -80 || p.y < -80 || p.x > w + 80 || p.y > h + 80) continue;
     const key = bodyKey(base.name);
-    paintBody(ctx, key, p.x, p.y, key === "starbase" ? 52 : 44);
+    const size = Math.max(10, base.r * cam.scale * 2);
+    paintBody(ctx, key, p.x, p.y, size);
     ctx.fillStyle = AMBER;
     ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-    ctx.fillText(base.num > 0 ? `SB${base.num} ${base.name}` : base.name, p.x + 28, p.y - 8);
+    ctx.fillText(base.num > 0 ? `SB${base.num} ${base.name}` : base.name, p.x + size * 0.6, p.y - 8);
     ctx.fillStyle = MUTED;
-    ctx.fillText(base.race, p.x + 28, p.y + 8);
+    ctx.fillText(base.race, p.x + size * 0.6, p.y + 8);
   }
 
   for (const g of sim.picks) {
@@ -527,19 +546,24 @@ function drawLongRange(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) 
   ctx.strokeStyle = "#1a4a72";
   ctx.strokeRect(x0, y0, size, size);
   const quad = sim.player.quad;
+  const zone = zoneOf(quad);
+  const spanX = Math.max(1, zone.maxX - zone.minX);
+  const spanY = Math.max(1, zone.maxY - zone.minY);
+  const span = Math.max(spanX, spanY);
   const m = (wx: number, wy: number) => ({
-    x: x0 + (wx / WORLD) * size,
-    y: y0 + (wy / WORLD) * size,
+    x: x0 + ((wx - zone.minX) / spanX) * size,
+    y: y0 + ((wy - zone.minY) / spanY) * size,
   });
+  const dot = (r: number) => Math.max(3, Math.min(16, (r / span) * size * 2.4));
   for (const planet of PLANETS) {
     if (planet.quad !== quad) continue;
     const p = m(planet.x, planet.y);
-    paintBody(ctx, bodyKey(planet.name), p.x, p.y, 8);
+    paintBody(ctx, bodyKey(planet.name), p.x, p.y, dot(planet.r));
   }
   for (const base of BASES) {
     if (base.quad !== quad) continue;
     const p = m(base.x, base.y);
-    paintBody(ctx, bodyKey(base.name), p.x, p.y, 10);
+    paintBody(ctx, bodyKey(base.name), p.x, p.y, Math.max(dot(base.r), 4));
   }
   for (const hole of HOLES) {
     if (hole.quad !== quad) continue;
@@ -573,25 +597,35 @@ function drawLongRange(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) 
 
 type Pane = { x: number; y: number; w: number; h: number };
 
-function place(fwd: number, lat: number, pane: Pane) {
+function place(fwd: number, lat: number, pane: Pane, elev = 0, radius = 48) {
   if (fwd < 36) return null;
   const cx = pane.x + pane.w / 2;
   const horizon = pane.y + pane.h * 0.36;
   const focal = pane.h * 0.92;
   const sx = cx + (lat / fwd) * focal;
-  const sy = horizon + Math.min(pane.h * 0.58, (focal * 110) / fwd);
-  const size = Math.max(16, Math.min(pane.h * 0.62, 15000 / fwd));
+  const sy =
+    horizon +
+    Math.min(pane.h * 0.58, (focal * 110) / fwd) -
+    (elev / Math.max(fwd, 80)) * pane.h * 0.45;
+  const size = Math.max(8, Math.min(pane.h * 0.5, (radius / Math.max(fwd, 40)) * pane.h * 0.9));
   return { sx, sy, size, fwd };
 }
 
-function project(player: { x: number; y: number; yaw: number }, wx: number, wy: number, pane: Pane) {
+function project(
+  player: { x: number; y: number; z: number; yaw: number },
+  wx: number,
+  wy: number,
+  wz: number,
+  pane: Pane,
+  radius = 48,
+) {
   const dx = wx - player.x;
   const dy = wy - player.y;
   const fx = -Math.sin(player.yaw);
   const fy = -Math.cos(player.yaw);
   const rx = Math.cos(player.yaw);
   const ry = -Math.sin(player.yaw);
-  return place(dx * fx + dy * fy, dx * rx + dy * ry, pane);
+  return place(dx * fx + dy * fy, dx * rx + dy * ry, pane, wz - player.z, radius);
 }
 
 function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
@@ -647,10 +681,10 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
 
   for (const base of BASES) {
     if (base.quad !== player.quad) continue;
-    const p = project(player, base.x, base.y, pane);
-    if (!p || p.fwd > 7000) continue;
+    const p = project(player, base.x, base.y, base.z, pane, base.r);
+    if (!p || p.fwd > 9000) continue;
     const key = bodyKey(base.name);
-    paintBody(ctx, key, p.sx, p.sy, Math.max(18, p.size * (key === "starbase" ? 0.7 : 0.55)));
+    paintBody(ctx, key, p.sx, p.sy, p.size);
     ctx.fillStyle = MUTED;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
     ctx.fillText(base.num > 0 ? `SB${base.num}` : base.name, p.sx + p.size * 0.4, p.sy);
@@ -658,10 +692,10 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
 
   for (const planet of PLANETS) {
     if (planet.quad !== player.quad) continue;
-    const p = project(player, planet.x, planet.y, pane);
-    if (!p || p.fwd > 7000) continue;
+    const p = project(player, planet.x, planet.y, planet.z, pane, planet.r);
+    if (!p || p.fwd > 9000) continue;
     const key = bodyKey(planet.name);
-    paintBody(ctx, key, p.sx, p.sy, Math.max(16, p.size * (key === "nebula" || key === "carina" ? 0.9 : 0.5)));
+    paintBody(ctx, key, p.sx, p.sy, p.size);
     ctx.fillStyle = MUTED;
     ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
     ctx.fillText(planet.name, p.sx + p.size * 0.35, p.sy);
@@ -671,7 +705,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
   for (const ship of sim.ships) {
     if (!ship.alive || ship.isPlayer) continue;
     if (!sim.visible(player, ship)) continue;
-    const p = project(player, ship.x, ship.y, pane);
+    const p = project(player, ship.x, ship.y, ship.z, pane, 36);
     if (!p || p.sx < pane.x - 120 || p.sx > pane.x + pane.w + 120) continue;
     marks.push({
       id: ship.id,
@@ -709,7 +743,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
   }
 
   for (const bolt of sim.bolts) {
-    const p = project(player, bolt.x, bolt.y, pane);
+    const p = project(player, bolt.x, bolt.y, bolt.z, pane, 8);
     if (!p) continue;
     const owner = sim.shipById(bolt.owner);
     ctx.fillStyle = owner?.isPlayer ? BLUE : RED;
@@ -719,7 +753,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
   }
 
   for (const beam of sim.beams) {
-    const hit = project(player, beam.x2, beam.y2, pane);
+    const hit = project(player, beam.x2, beam.y2, player.z, pane, 8);
     ctx.strokeStyle = beam.byPlayer ? BLUE : RED;
     ctx.globalAlpha = Math.max(0.4, beam.life / 0.16);
     ctx.lineWidth = beam.esi ? 3 : 2;
@@ -729,7 +763,7 @@ function drawForward(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
       if (hit) ctx.lineTo(hit.sx, hit.sy);
       else ctx.lineTo(cx, horizon);
     } else if (hit) {
-      const src = project(player, beam.x1, beam.y1, pane);
+      const src = project(player, beam.x1, beam.y1, player.z, pane, 8);
       if (!src) continue;
       ctx.moveTo(src.sx, src.sy);
       ctx.lineTo(hit.sx, hit.sy);
@@ -772,10 +806,16 @@ export function pointerCommand(
       const size = Math.max(8, Math.min(longW - 16, split - 28));
       const x0 = (longW - size) / 2;
       const y0 = 22;
+      const zone = zoneOf(sim.player.quad);
       const nx = (sx - x0) / size;
       const ny = (sy - y0) / size;
       if (nx >= 0 && ny >= 0 && nx <= 1 && ny <= 1) {
-        return { kind: "course", x: nx * WORLD, y: ny * WORLD, go: true };
+        return {
+          kind: "course",
+          x: zone.minX + nx * (zone.maxX - zone.minX),
+          y: zone.minY + ny * (zone.maxY - zone.minY),
+          go: true,
+        };
       }
       return null;
     }
@@ -793,7 +833,7 @@ export function pointerCommand(
   let bestD = 36;
   for (const ship of sim.ships) {
     if (!ship.alive || ship.isPlayer || !sim.visible(sim.player, ship)) continue;
-    const p = project(sim.player, ship.x, ship.y, pane);
+    const p = project(sim.player, ship.x, ship.y, ship.z, pane, 36);
     if (!p) continue;
     const d = Math.hypot(p.sx - sx, p.sy - sy);
     if (d < Math.max(bestD, p.size * 0.45)) {

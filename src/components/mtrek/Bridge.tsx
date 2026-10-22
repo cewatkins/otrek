@@ -120,9 +120,8 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
         e.preventDefault();
       }
-      const warpUp = (e.code === "KeyW" || e.code === "ArrowUp") && !e.shiftKey;
-      const warpDn =
-        e.code === "KeyS" || e.code === "ArrowDown" || ((e.code === "KeyW" || e.code === "ArrowUp") && e.shiftKey);
+      const warpUp = e.code === "KeyW" && !e.shiftKey;
+      const warpDn = e.code === "KeyS" || (e.code === "KeyW" && e.shiftKey);
       if ((warpUp || warpDn) && !e.repeat) sim.nudgeWarp(warpUp ? 1 : -1);
       if (e.repeat) return;
       if (e.code === "KeyR" && e.shiftKey) {
@@ -155,6 +154,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       sim.keys.clear();
       sim.touchSteer = 0;
       sim.touchWarp = 0;
+      sim.touchClimb = 0;
       sim.touchPhaser = false;
       sim.touchTorp = false;
       sim.touchDrone = false;
@@ -189,7 +189,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
     else sim.setCourse(cmd.x, cmd.y);
   };
 
-  const hold = (kind: "left" | "right" | "up" | "down" | "phaser" | "torp" | "drone" | "mine", on: boolean) => {
+  const hold = (kind: "left" | "right" | "up" | "down" | "zup" | "zdn" | "phaser" | "torp" | "drone" | "mine", on: boolean) => {
     const sim = simRef.current;
     if (!sim) return;
     unlockAudio();
@@ -197,6 +197,8 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
     if (kind === "right") sim.touchSteer = on ? -1 : sim.touchSteer === -1 ? 0 : sim.touchSteer;
     if (kind === "up") sim.touchWarp = on ? 1 : sim.touchWarp === 1 ? 0 : sim.touchWarp;
     if (kind === "down") sim.touchWarp = on ? -1 : sim.touchWarp === -1 ? 0 : sim.touchWarp;
+    if (kind === "zup") sim.touchClimb = on ? 1 : sim.touchClimb === 1 ? 0 : sim.touchClimb;
+    if (kind === "zdn") sim.touchClimb = on ? -1 : sim.touchClimb === -1 ? 0 : sim.touchClimb;
     if (kind === "phaser") sim.touchPhaser = on;
     if (kind === "torp") sim.touchTorp = on;
     if (kind === "drone") sim.touchDrone = on;
@@ -262,6 +264,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       {snap && (
         <div className="flex shrink-0 gap-3 overflow-x-auto border-b border-line px-3 py-2 font-mono text-xs md:hidden">
           <span>W {snap.warp.toFixed(1)}</span>
+          <span>Z {Math.round(snap.z)}</span>
           <span className={snap.hull / snap.hullMax < 0.3 ? "text-alert" : ""}>
             HULL {Math.round((snap.hull / snap.hullMax) * 100)}%
           </span>
@@ -353,6 +356,8 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
         <Pad label="Left" on={hold} kind="left" />
         <Pad label="Warp+" on={hold} kind="up" />
         <Pad label="Warp−" on={hold} kind="down" />
+        <Pad label="Z+" on={hold} kind="zup" />
+        <Pad label="Z−" on={hold} kind="zdn" />
         <Pad label="Right" on={hold} kind="right" />
         <Pad label="Phaser" on={hold} kind="phaser" />
         <Pad label="Torpedo" on={hold} kind="torp" />
@@ -396,10 +401,10 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="key-marquee py-2 font-mono text-xs whitespace-nowrap text-muted">
             <span className="px-6">
-              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · 2 nearest base, dock and repair · 5 autolock · 7 AI helm · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
+              W raises warp · S lowers warp, then reverse · Up / Down change Z · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · 2 nearest base, dock and repair · 5 autolock · 7 AI helm · click the long-range chart to fly there · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
             </span>
             <span className="px-6" aria-hidden="true">
-              W / Up raises warp · S / Down lowers warp, then reverse · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · 2 nearest base, dock and repair · 5 autolock · 7 AI helm · click empty space to come about · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
+              W raises warp · S lowers warp, then reverse · Up / Down change Z · Shift+W slows · A / Left turn left · D / Right turn right · click a ship to lock · 2 nearest base, dock and repair · 5 autolock · 7 AI helm · click the long-range chart to fly there · Space F P phasers · T torpedoes · G drones · M mines · R raise shields · Shift+R drop shields · C repair · Z cloak · I intercept · X transwarp · . dock (reloads torpedoes) · U undock · H or / help · 9 dock log · Esc pause · type and Send to hail
             </span>
           </div>
         </div>
@@ -435,7 +440,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
             </div>
             {helpPage === "commands" ? (
             <ul className="mt-4 space-y-2 font-mono text-xs leading-relaxed text-fg">
-              <li><span className="text-amber">Flight.</span> W or Up raises warp, one step per tap and more if you hold it. S or Down lowers warp and then reverses. Shift+W also slows. A or Left turns left. D or Right turns right. Click empty space to come about. Click the long-range chart to plot a course to that point. These keys still work if intercept is on.</li>
+              <li><span className="text-amber">Flight.</span> W raises warp, one step per tap and more if you hold it. S lowers warp and then reverses. Shift+W also slows. Up and Down change Z. A or Left turns left. D or Right turns right. Click empty space to come about. Click the long-range chart to plot a course, including the Z of a body you click. These keys still work if intercept is on.</li>
               <li><span className="text-amber">Lock.</span> Autolock is on when you launch. It holds the ship shooting at you, otherwise the closest one you can see. Press 5 to turn autolock off and pick a lock yourself. Click a ship on the radar or the forward view. Humans are a, b, c. Blue beams are yours. Red beams are theirs.</li>
               <li><span className="text-amber">Base run.</span> 2 steers to the closest starbase, slows, docks, and the yard repairs the hull and refills everything. Press 2 again, or touch the helm, to cancel.</li>
               <li><span className="text-amber">AI helm.</span> 7 hands your ship to the same captain the robots use. It hunts, shoots, flees, and docks. Press 7 again to take the helm back.</li>
@@ -515,6 +520,7 @@ function Status({ snap }: { snap: Snapshot }) {
     <div className="space-y-4 font-mono text-xs">
       <Stat k="WARP" v={`${snap.warp.toFixed(1)} / ${snap.maxWarp}`} />
       <Stat k="HEADING" v={pad3(snap.heading)} />
+      <Stat k="Z" v={String(Math.round(snap.z))} />
       <Bar k="ENERGY" pct={snap.energy / snap.energyMax} />
       <Bar k="SHIELDS" pct={snap.shield / 100} hot={snap.shield < 30} />
       <Bar k="HULL" pct={hullPct} hot={hullPct < 0.3} />
@@ -660,8 +666,8 @@ function Pad({
   on,
 }: {
   label: string;
-  kind: "left" | "right" | "up" | "down" | "phaser" | "torp" | "drone" | "mine";
-  on: (kind: "left" | "right" | "up" | "down" | "phaser" | "torp" | "drone" | "mine", down: boolean) => void;
+  kind: "left" | "right" | "up" | "down" | "zup" | "zdn" | "phaser" | "torp" | "drone" | "mine";
+  on: (kind: "left" | "right" | "up" | "down" | "zup" | "zdn" | "phaser" | "torp" | "drone" | "mine", down: boolean) => void;
 }) {
   return (
     <button
