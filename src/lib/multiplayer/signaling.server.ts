@@ -250,7 +250,8 @@ export async function handleSignaling(request: Request): Promise<Response> {
     if (request.method === "POST") return await handlePost(request);
     return json({ error: "method not allowed" }, 405);
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     console.error("[rtc] signaling error:", error);
-    return json({ error: "signaling failed" }, 500);
+    return json({ error: "signaling failed", detail: detail.slice(0, 180) }, 500);
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
-import { useP2PRoom } from "@/lib/multiplayer";
-import type { HumanRow } from "@/lib/multiplayer/p2p";
 import type { TrekSim } from "@/game/sim";
+import type { BoardMsg } from "@/lib/multiplayer/relay";
+import { useBoard } from "@/lib/multiplayer/use-board";
 
 type Props = {
   room: string;
@@ -10,186 +10,118 @@ type Props = {
   sendRef: MutableRefObject<((data: unknown) => void) | null>;
 };
 
-type Pose = {
-  k?: string;
-  text?: string;
-  n?: number;
-  name?: string;
-  classId?: string;
-  x?: number;
-  y?: number;
-  yaw?: number;
-  warp?: number;
-  shield?: number;
-  hull?: number;
-  cloaked?: boolean;
-  docked?: boolean;
-  alive?: boolean;
-  quad?: "A" | "B";
-  hail?: { text?: string; n?: number } | null;
-};
-
-function poseOf(sim: TrekSim, hail: { text: string; n: number } | null): Pose {
-  const p = sim.player;
-  return {
-    k: "pose",
-    name: p.name,
-    classId: p.cls.id,
-    x: p.x,
-    y: p.y,
-    yaw: p.yaw,
-    warp: p.warp,
-    shield: p.shield,
-    hull: p.hull,
-    cloaked: p.cloaked,
-    docked: p.docked,
-    alive: p.alive && !sim.over,
-    quad: p.quad,
-    hail,
-  };
-}
-
-export function NetLink({ room, name, simRef, sendRef }: Props) {
-  const p2p = useP2PRoom({ room: `otrek-${room}`.slice(0, 64), name });
-  const [label, setLabel] = useState("linking");
-  const [humans, setHumans] = useState<HumanRow[]>([]);
-  const [notice, setNotice] = useState("");
+export function NetLink({ name, simRef, sendRef }: Props) {
+  const [selfId] = useState(() => `p-${Math.random().toString(36).slice(2, 10)}`);
   const hailRef = useRef<{ text: string; n: number } | null>(null);
-  const heard = useRef(new Map<string, number>());
-  const known = useRef(new Set<string>());
-  const seenOnce = useRef(false);
+  const heardHits = useRef(new Map<string, number>());
+  const heardHail = useRef(new Map<string, number>());
 
   const hear = (from: string, text: string, n: number) => {
-    if (!text || !n || heard.current.get(from) === n) return;
-    heard.current.set(from, n);
+    if (!text || !n || heardHail.current.get(from) === n) return;
+    heardHail.current.set(from, n);
     simRef.current?.say(text.slice(0, 96), "amber");
   };
 
+  const onMessage = (msg: BoardMsg) => {
+    const sim = simRef.current;
+    if (!sim) return;
+    if (msg.bye) {
+      const sim = simRef.current;
+      if (!sim) return;
+      sim.dropRemotes(
+        sim.ships.filter((ship) => ship.remote && ship.id !== `net:${msg.id}`).map((ship) => ship.id.slice(4)),
+      );
+      return;
+    }
+    if (msg.hit && msg.hit.to === selfId) {
+      const n = Number(msg.hit.n) || 0;
+      if (n > (heardHits.current.get(msg.id) ?? 0)) {
+        heardHits.current.set(msg.id, n);
+        sim.applyIncoming(Number(msg.hit.dmg) || 0, String(msg.hit.by ?? msg.name ?? "someone"));
+      }
+    }
+    if (msg.kind === "hit" && msg.to === selfId) {
+      const n = Number(msg.n) || 0;
+      if (n === 0 || n > (heardHits.current.get(msg.id) ?? 0)) {
+        if (n) heardHits.current.set(msg.id, n);
+        sim.applyIncoming(Number(msg.dmg) || 0, String(msg.by ?? "someone"));
+      }
+    }
+    if (typeof msg.x === "number" && typeof msg.y === "number") sim.upsertRemote(msg.id, msg);
+    if (msg.hail?.text) hear(msg.id, String(msg.hail.text), Number(msg.hail.n) || 0);
+  };
+
+  const board = useBoard(selfId, name, true, true, onMessage);
+
   useEffect(() => {
     sendRef.current = (data) => {
-      p2p.send(data);
-      p2p.broadcast(data);
       if (!data || typeof data !== "object") return;
-      const msg = data as { k?: string; text?: string; n?: number };
-      if (msg.k !== "hail" || !msg.text) return;
-      hailRef.current = { text: msg.text, n: Number(msg.n) || Date.now() };
-      const sim = simRef.current;
-      if (sim) p2p.publishState(poseOf(sim, hailRef.current));
+      const msg = data as { k?: string; text?: string; n?: number; to?: string; dmg?: number; by?: string };
+      if (msg.k === "hail" && msg.text) {
+        hailRef.current = { text: msg.text, n: Number(msg.n) || Date.now() };
+        board.publish({ hail: hailRef.current });
+      }
+      if (msg.k === "hit" && msg.to) board.publish({ kind: "hit", to: msg.to, dmg: msg.dmg, by: msg.by });
     };
     return () => {
       sendRef.current = null;
     };
-  }, [p2p.send, p2p.broadcast, p2p.publishState, sendRef, simRef]);
-
-  useEffect(() => {
-    const sim = simRef.current;
-    if (!sim) return;
-    sim.onStrike = (peer, raw) => {
-      if (peer) p2p.send({ k: "hit", to: peer, dmg: raw, by: sim.player.name });
-    };
-    return () => {
-      sim.onStrike = null;
-    };
-  }, [p2p.send, simRef]);
-
-  useEffect(
-    () =>
-      p2p.onMessage((from, data) => {
-        if (!data || typeof data !== "object") return;
-        const msg = data as Pose & { to?: string; dmg?: number; by?: string };
-        const sim = simRef.current;
-        if (!sim) return;
-        if (msg.k === "pose") sim.upsertRemote(from, msg);
-        if (msg.k === "hit" && msg.to === p2p.selfId) {
-          sim.applyIncoming(Number(msg.dmg) || 0, String(msg.by ?? "someone"));
-        }
-        if (msg.k === "hail" && msg.text) hear(from, msg.text, Number(msg.n) || 0);
-      }),
-    [p2p.onMessage, p2p.selfId, simRef],
-  );
-
-  useEffect(
-    () =>
-      p2p.onRoster((peers) => {
-        const sim = simRef.current;
-        if (!sim) return;
-        for (const peer of peers) {
-          if (peer.id === p2p.selfId || !peer.state || typeof peer.state !== "object") continue;
-          const pose = peer.state as Pose;
-          if (pose.k !== "pose") continue;
-          sim.upsertRemote(peer.id, pose);
-          if (pose.hail?.text) hear(peer.id, String(pose.hail.text), Number(pose.hail.n) || 0);
-        }
-      }),
-    [p2p.onRoster, p2p.selfId, simRef],
-  );
-
-  useEffect(
-    () =>
-      p2p.onHumans((list) => {
-        setHumans(list);
-        const sim = simRef.current;
-        if (!seenOnce.current) {
-          for (const human of list) known.current.add(human.id);
-          seenOnce.current = true;
-          return;
-        }
-        for (const human of list) {
-          if (human.id === p2p.selfId || known.current.has(human.id)) continue;
-          known.current.add(human.id);
-          const line = human.playing ? `${human.name} is in the quadrant.` : `${human.name} logged in.`;
-          setNotice(line);
-          sim?.say(line, "amber");
-        }
-      }),
-    [p2p.onHumans, p2p.selfId, simRef],
-  );
+  }, [board.publish, sendRef]);
 
   useEffect(() => {
     let last = 0;
-    let posted = 0;
     let raf = 0;
     const loop = (now: number) => {
       const sim = simRef.current;
-      const p = sim?.player;
-      if (p && sim && now - last > 100) {
+      if (sim) {
+        sim.onStrike = (peer, raw) => {
+          const hit = sim.lastStrike;
+          if (peer && hit) board.publish({ kind: "hit", to: peer, dmg: raw, n: hit.n, by: sim.player.name });
+        };
+      }
+      if (sim && now - last > 400) {
         last = now;
-        const pose = poseOf(sim, hailRef.current);
-        p2p.broadcast(pose);
-        if (now - posted > 400) {
-          posted = now;
-          p2p.publishState(pose);
-        }
+        const p = sim.player;
+        board.publish({
+          classId: p.cls.id,
+          x: p.x,
+          y: p.y,
+          yaw: p.yaw,
+          warp: p.warp,
+          shield: p.shield,
+          hull: p.hull,
+          cloaked: p.cloaked,
+          docked: p.docked,
+          alive: p.alive && !sim.over,
+          quad: p.quad,
+          hail: hailRef.current,
+          hit: sim.lastStrike,
+        });
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [p2p.broadcast, p2p.publishState, simRef]);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (simRef.current) simRef.current.onStrike = null;
+    };
+  }, [board.publish, simRef]);
 
-  useEffect(() => {
-    simRef.current?.dropRemotes(p2p.peers.map((peer) => peer.id));
-    const linked = p2p.peers.filter((peer) => peer.connectionState === "connected").length;
-    setLabel(!p2p.joined ? "linking" : linked ? `${linked} linked` : "on the board");
-  }, [p2p.joined, p2p.peers, simRef]);
-
-  const handles = humans.length ? humans : [{ id: "you", name, playing: true }];
+  const handles = [{ id: selfId, name, playing: true as boolean }, ...board.humans];
 
   return (
-    <div className="pointer-events-none absolute top-14 left-3 z-10 w-56 border border-line bg-bg/90 px-3 py-2 font-mono text-xs">
-      <p className="text-amber">
-        HUMANS · {humans.length || 1}
-      </p>
-      <ul className="mt-1 space-y-0.5 text-fg">
+    <div className="shrink-0 border-b border-line px-3 py-2 font-mono text-xs">
+      <p className="tracking-widest text-amber">HUMANS · {handles.length}</p>
+      <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto text-fg">
         {handles.map((human) => (
           <li key={human.id} className="truncate">
             {human.name}
-            {human.id === p2p.selfId || human.id === "you" ? " · you" : human.playing ? " · in the fight" : " · logged in"}
+            {human.id === selfId ? " · you" : human.playing ? " · in" : " · yard"}
           </li>
         ))}
       </ul>
-      {notice ? <p className="mt-1 text-amber">{notice}</p> : null}
-      <p className="mt-1 text-muted">{label}</p>
+      {board.notice ? <p className="mt-1 text-amber">{board.notice}</p> : null}
+      <p className="mt-1 text-muted">{board.status}</p>
     </div>
   );
 }

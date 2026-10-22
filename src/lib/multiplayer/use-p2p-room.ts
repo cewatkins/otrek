@@ -11,6 +11,7 @@ export interface P2PRoomHandle {
   room: string;
   peers: PeerInfo[];
   joined: boolean;
+  linkError: string;
   broadcast: (data: unknown) => void;
   publishState: (data: unknown) => void;
   send: (data: unknown, peerId?: string) => void;
@@ -27,6 +28,7 @@ export function useP2PRoom(options: UseP2PRoomOptions = {}): P2PRoomHandle {
   const [name] = useState(() => options.name ?? selfId);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
   const [joined, setJoined] = useState(false);
+  const [linkError, setLinkError] = useState("");
   const roomRef = useRef<P2PRoom | null>(null);
   const listeners = useRef(
     new Set<(from: string, data: unknown, channel: "state" | "reliable") => void>(),
@@ -50,6 +52,7 @@ export function useP2PRoom(options: UseP2PRoomOptions = {}): P2PRoomHandle {
         for (const fn of humanListeners.current) fn(humans);
       },
       onConnected: () => setJoined(true),
+      onStatus: (message) => setLinkError(message),
     });
     roomRef.current = p2p;
     void p2p.join();
@@ -87,5 +90,5 @@ export function useP2PRoom(options: UseP2PRoomOptions = {}): P2PRoomHandle {
     };
   }, []);
 
-  return { selfId, room, peers, joined, broadcast, publishState, send, onMessage, onRoster, onHumans };
+  return { selfId, room, peers, joined, linkError, broadcast, publishState, send, onMessage, onRoster, onHumans };
 }

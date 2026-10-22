@@ -129,6 +129,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
       if (e.code === "KeyX") sim.transwarp();
       if (e.code === "Period") sim.requestDock();
       if (e.code === "KeyU") sim.requestUndock();
+      if (e.code === "Digit9" || e.code === "Numpad9") sim.toggleVerbose();
       if (e.code === "KeyH" || e.code === "Slash") setHelp((v) => !v);
       if (e.code === "Escape") setPaused((v) => !v);
     };
@@ -241,8 +242,6 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
           </button>
         </div>
       </header>
-      {room ? <NetLink room={room} name={name} simRef={simRef} sendRef={netSend} /> : null}
-
       {snap && (
         <div className="flex shrink-0 gap-3 overflow-x-auto border-b border-line px-3 py-2 font-mono text-xs md:hidden">
           <span>W {snap.warp.toFixed(1)}</span>
@@ -255,7 +254,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-row">
         <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-line p-3 md:block">
           {snap && <Status snap={snap} />}
         </aside>
@@ -267,23 +266,6 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
             className="h-full w-full touch-none"
             aria-label="Tactical display"
           />
-          {snap && snap.messages.length > 0 && (
-            <div className="pointer-events-none absolute top-14 right-3 z-10 max-w-[16rem] space-y-0.5">
-              {snap.messages
-                .slice(0, 5)
-                .reverse()
-                .map((line, i) => (
-                  <p
-                    key={`${i}-${line.text}`}
-                    className={`font-mono text-xs leading-relaxed ${
-                      line.tone === "alert" ? "text-alert" : line.tone === "amber" ? "text-amber" : "text-muted"
-                    }`}
-                  >
-                    {line.text}
-                  </p>
-                ))}
-            </div>
-          )}
           {snap?.docked && (
             <div className="pointer-events-none absolute top-3 left-3 border border-amber bg-bg/90 px-3 py-2 font-mono text-xs text-amber">
               DOCKED · {snap.dockName}
@@ -332,16 +314,11 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
           )}
         </div>
 
-        <aside className="hidden min-h-0 w-64 shrink-0 flex-col border-l border-line md:flex">
+        <aside className="flex min-h-0 w-40 shrink-0 flex-col border-l border-line sm:w-60">
+          {room ? <NetLink room={room} name={name} simRef={simRef} sendRef={netSend} /> : null}
           {snap && <Scanner snap={snap} onLock={(id) => act((sim) => sim.lockShip(id))} />}
         </aside>
       </div>
-
-      {snap && (
-        <div className="shrink-0 border-t border-line md:hidden">
-          <Scanner snap={snap} onLock={(id) => act((sim) => sim.lockShip(id))} compact />
-        </div>
-      )}
 
       <div className="grid shrink-0 grid-cols-4 gap-1 border-t border-line p-2 md:hidden">
         <Pad label="Left" on={hold} kind="left" />
@@ -398,6 +375,7 @@ export function Bridge({ name, classId, room, onLeave }: Props) {
               <li>Dock inside 100 units under warp 1.4. Gold paid there is (damage + veteran bonus) / 10. Klingon obliterators return one every two seconds.</li>
               <li>R raises shields. Shift+R drops them. C repairs the hull. Dilithium soaks damage that gets through the shields and refills when you dock. Planets trickle energy.</li>
               <li>Wormholes open and shut about once a minute. Cloaked ships cannot enter, and the same ship must wait a minute to transit again.</li>
+              <li>9 shows dock, undock, and vault lines. They stay hidden otherwise.</li>
             </ul>
             <div className="mt-5 flex gap-2">
               <button

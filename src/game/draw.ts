@@ -59,7 +59,11 @@ export function radarSplit(h: number) {
 }
 
 function gaugeWidth(w: number) {
-  return Math.round(Math.min(220, Math.max(128, w * 0.28)));
+  return Math.round(Math.min(168, Math.max(108, w * 0.18)));
+}
+
+function longWidth(w: number) {
+  return Math.round(Math.min(240, Math.max(112, w * 0.26)));
 }
 
 export function cameraFor(sim: TrekSim, w: number, h: number): Camera {
@@ -174,12 +178,14 @@ export function drawTactical(
   const { w, h } = cam;
   if (!cam.radarOnly) {
     const split = radarSplit(h);
+    const longW = longWidth(w);
     const gauges = gaugeWidth(w);
     ctx.save();
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, w, h);
-    drawGauges(ctx, sim, { x: 0, y: 0, w: gauges, h: split });
-    const radarX = gauges + 1;
+    drawLongRange(ctx, sim, { x: 0, y: 0, w: longW, h: split });
+    drawGauges(ctx, sim, { x: longW + 1, y: 0, w: gauges, h: split });
+    const radarX = longW + gauges + 2;
     const radarW = Math.max(1, w - radarX);
     ctx.save();
     ctx.beginPath();
@@ -200,8 +206,10 @@ export function drawTactical(
     ctx.beginPath();
     ctx.moveTo(0, split + 0.5);
     ctx.lineTo(w, split + 0.5);
-    ctx.moveTo(gauges + 0.5, 0);
-    ctx.lineTo(gauges + 0.5, split);
+    ctx.moveTo(longW + 0.5, 0);
+    ctx.lineTo(longW + 0.5, split);
+    ctx.moveTo(radarX - 0.5, 0);
+    ctx.lineTo(radarX - 0.5, split);
     ctx.stroke();
     drawForward(ctx, sim, { x: 0, y: split + 1, w, h: Math.max(1, h - split - 1) });
     ctx.restore();
@@ -437,7 +445,7 @@ export function drawTactical(
 
   ctx.fillStyle = MUTED;
   ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-  ctx.fillText("RADAR", 10, 16);
+  ctx.fillText("SHORT RANGE", 10, 16);
 
   const hullPct = player.cls.hull > 0 ? player.hull / player.cls.hull : 1;
   if (!cam.radarOnly && hullPct < 0.3 && player.alive) {
@@ -448,25 +456,26 @@ export function drawTactical(
     ctx.fillRect(0, 0, w, h);
   }
 
-  if (!cam.radarOnly) drawMinimap(ctx, sim, w, h);
   ctx.restore();
 }
 
-function drawMinimap(ctx: CanvasRenderingContext2D, sim: TrekSim, w: number, h: number) {
-  const size = Math.min(148, Math.max(96, w * 0.22));
-  const pad = 12;
-  const x0 = w - size - pad;
-  const y0 = h - size - pad;
-  ctx.fillStyle = "rgba(12,10,7,0.82)";
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 1;
-  ctx.fillRect(x0, y0, size, size);
+function drawLongRange(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pane.x, pane.y, pane.w, pane.h);
+  ctx.clip();
+  ctx.fillStyle = BG;
+  ctx.fillRect(pane.x, pane.y, pane.w, pane.h);
+  const size = Math.max(8, Math.min(pane.w - 16, pane.h - 28));
+  const x0 = pane.x + (pane.w - size) / 2;
+  const y0 = pane.y + 22;
+  ctx.strokeStyle = "#1a4a72";
   ctx.strokeRect(x0, y0, size, size);
+  const quad = sim.player.quad;
   const m = (wx: number, wy: number) => ({
     x: x0 + (wx / WORLD) * size,
     y: y0 + (wy / WORLD) * size,
   });
-  const quad = sim.player.quad;
   ctx.fillStyle = MUTED;
   for (const planet of PLANETS) {
     if (planet.quad !== quad) continue;
@@ -479,16 +488,23 @@ function drawMinimap(ctx: CanvasRenderingContext2D, sim: TrekSim, w: number, h: 
     const p = m(base.x, base.y);
     ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
   }
-  for (const ship of sim.ships) {
-    if (!ship.alive) continue;
-    if (!ship.isPlayer && !sim.visible(sim.player, ship)) continue;
-    const p = m(ship.x, ship.y);
-    ctx.fillStyle = ship.isPlayer ? AMBER : ALERT;
-    ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+  for (const hole of HOLES) {
+    if (hole.quad !== quad) continue;
+    const p = m(hole.x, hole.y);
+    ctx.strokeStyle = sim.holeOpen ? GOLD : MUTED;
+    ctx.strokeRect(p.x - 3, p.y - 3, 6, 6);
   }
-  ctx.fillStyle = MUTED;
+  for (const ship of sim.ships) {
+    if (!ship.alive || ship.quad !== quad) continue;
+    if (!ship.isPlayer && !ship.remote && !sim.visible(sim.player, ship)) continue;
+    const p = m(ship.x, ship.y);
+    ctx.fillStyle = ship.isPlayer ? GOLD : ship.remote ? "#7ee0ff" : ALERT;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
+  ctx.fillStyle = GOLD;
   ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";
-  ctx.fillText("QUADRANT", x0 + 6, y0 + 14);
+  ctx.fillText("LONG RANGE", pane.x + 8, pane.y + 14);
+  ctx.restore();
 }
 
 type Pane = { x: number; y: number; w: number; h: number };
@@ -682,12 +698,24 @@ export function pointerCommand(
   sy: number,
 ): { kind: "lock"; id: string } | { kind: "course"; x: number; y: number } {
   const split = radarSplit(h);
+  const longW = longWidth(w);
   const gauges = gaugeWidth(w);
   if (sy <= split) {
-    if (sx < gauges) return { kind: "course", x: sim.player.x, y: sim.player.y };
-    const radarW = Math.max(1, w - gauges - 1);
+    if (sx < longW) {
+      const size = Math.max(8, Math.min(longW - 16, split - 28));
+      const x0 = (longW - size) / 2;
+      const y0 = 22;
+      const nx = (sx - x0) / size;
+      const ny = (sy - y0) / size;
+      if (nx >= 0 && ny >= 0 && nx <= 1 && ny <= 1) {
+        return { kind: "course", x: nx * WORLD, y: ny * WORLD };
+      }
+      return { kind: "course", x: sim.player.x, y: sim.player.y };
+    }
+    if (sx < longW + gauges + 1) return { kind: "course", x: sim.player.x, y: sim.player.y };
+    const radarW = Math.max(1, w - longW - gauges - 2);
     const cam = cameraFor(sim, radarW, split);
-    const localX = sx - gauges - 1;
+    const localX = sx - longW - gauges - 2;
     const id = pickShipAt(sim, cam, localX, sy);
     if (id) return { kind: "lock", id };
     const world = screenToWorld(cam, localX, sy);

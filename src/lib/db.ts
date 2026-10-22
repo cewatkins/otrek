@@ -1,14 +1,13 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import { env } from "./env.server";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
 
-// An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
-// "unset" — otherwise production would silently run on the PGLite fallback.
-const rawDatabaseUrl =
-  typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
-const databaseUrl =
-  rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
+// Read through env() so the bundler cannot bake this as undefined at build time.
+// A static process.env.DATABASE_URL access gets replaced during the server build
+// and the published app then falls into PGLite, which dies on the host.
+const databaseUrl = env("DATABASE_URL");
 
 /**
  * Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
@@ -93,7 +92,13 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      max: 2,
+      ssl: databaseUrl?.includes("localhost") || databaseUrl?.includes("127.0.0.1")
+        ? undefined
+        : { rejectUnauthorized: false },
+    });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

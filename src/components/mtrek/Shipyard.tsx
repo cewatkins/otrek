@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { CLASSES, SHEETS } from "@/game/classes";
 import { QUADRANT_ROBOTS } from "@/game/sim";
 import { loadCallsign, loadScores, saveCallsign, type ScoreRow } from "@/game/scores";
+import { useBoard } from "@/lib/multiplayer/use-board";
 
 type Props = {
   onStart: (name: string, classId: string, room: string | null) => void;
@@ -9,27 +10,15 @@ type Props = {
 
 const QUADRANT = "ALPHA";
 
-type RoomRow = {
-  code: string;
-  count: number;
-  handles: string[];
-  players?: { id: string; name: string; playing: boolean }[];
-};
-
 export function Shipyard({ onStart }: Props) {
   const [classId, setClassId] = useState(CLASSES[0].id);
   const [name, setName] = useState("USS Intrepid");
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [real, setReal] = useState(true);
   const [shared, setShared] = useState(true);
-  const [board, setBoard] = useState<RoomRow | null>(null);
-  const [arrival, setArrival] = useState("");
-  const nameRef = useRef(name);
-  nameRef.current = name;
-  const selfId = useRef("");
-  const known = useRef(new Set<string>());
-  const seenOnce = useRef(false);
+  const [lobbyId] = useState(() => `w-${Math.random().toString(36).slice(2, 10)}`);
   const selected = CLASSES.find((c) => c.id === classId) ?? CLASSES[0];
+  const live = useBoard(lobbyId, name.trim().slice(0, 18) || "unnamed", false, shared);
 
   useEffect(() => {
     const saved = loadCallsign();
@@ -39,69 +28,6 @@ export function Shipyard({ onStart }: Props) {
     const q = new URLSearchParams(window.location.search);
     if (q.get("play") === "quadrant" || q.get("room")) setShared(true);
   }, []);
-
-  useEffect(() => {
-    let stop = false;
-    const pull = async () => {
-      try {
-        const res = await fetch("/api/rtc?op=rooms");
-        if (!res.ok) return;
-        const data = (await res.json()) as { rooms?: RoomRow[] };
-        const mine = data.rooms?.find((row) => row.code === QUADRANT) ?? null;
-        if (stop) return;
-        setBoard(mine);
-        const players = mine?.players ?? [];
-        if (!seenOnce.current) {
-          for (const player of players) known.current.add(player.id);
-          seenOnce.current = true;
-          return;
-        }
-        for (const player of players) {
-          if (player.id === selfId.current || known.current.has(player.id)) continue;
-          known.current.add(player.id);
-          setArrival(player.playing ? `${player.name} is in the quadrant.` : `${player.name} logged in.`);
-        }
-      } catch {
-        /* the board can wait for the next pass */
-      }
-    };
-    void pull();
-    const timer = window.setInterval(() => void pull(), 1500);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!shared) return;
-    const peerKey = "otrek-lobby-peer";
-    let peer = sessionStorage.getItem(peerKey) ?? "";
-    if (!/^w-[a-z0-9]{6,16}$/.test(peer)) {
-      peer = `w-${Math.random().toString(36).slice(2, 10)}`;
-      sessionStorage.setItem(peerKey, peer);
-    }
-    selfId.current = peer;
-    const roomId = `otrek-${QUADRANT}`;
-    let stop = false;
-    const beat = () => {
-      if (stop) return;
-      const handle = nameRef.current.trim().slice(0, 18) || "unnamed";
-      const q = new URLSearchParams({ room: roomId, peer, name: handle, since: "1" });
-      void fetch(`/api/rtc?${q}`);
-    };
-    beat();
-    const timer = window.setInterval(beat, 4000);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-      void fetch("/api/rtc", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ op: "leave", room: roomId, peer }),
-      });
-    };
-  }, [shared]);
 
   const launch = () => {
     const trimmed = name.trim().slice(0, 18) || "USS Intrepid";
@@ -128,21 +54,23 @@ export function Shipyard({ onStart }: Props) {
           </div>
           <div className="min-w-[16rem] flex-1 border border-line bg-surface px-3 py-2">
             <p className="font-mono text-[10px] tracking-widest text-amber">
-              HUMANS · {board?.players?.length ?? 0}
+              HUMANS · {(live.humans.length || 0) + (shared ? 1 : 0)}
             </p>
-            {!board?.players?.length ? (
-              <p className="mt-1 font-mono text-xs text-muted">No one else is logged in.</p>
+            {!shared ? (
+              <p className="mt-1 font-mono text-xs text-muted">Solo. Other players cannot see this ship.</p>
             ) : (
               <ul className="mt-1 space-y-0.5 font-mono text-xs">
-                {board.players.map((player) => (
+                <li className="truncate">{name.trim() || "unnamed"} · you</li>
+                {live.humans.map((player) => (
                   <li key={player.id} className="truncate">
                     {player.name}
-                    {player.id === selfId.current ? " · you" : player.playing ? " · in the fight" : " · logged in"}
+                    {player.playing ? " · in the fight" : " · logged in"}
                   </li>
                 ))}
               </ul>
             )}
-            {arrival ? <p className="mt-1 font-mono text-xs text-amber">{arrival}</p> : null}
+            {live.notice ? <p className="mt-1 font-mono text-xs text-amber">{live.notice}</p> : null}
+            <p className="mt-1 font-mono text-[10px] text-muted">{shared ? live.status : ""}</p>
           </div>
           <button
             type="button"
@@ -233,12 +161,12 @@ export function Shipyard({ onStart }: Props) {
               One room, like the original. Everyone starts in Alpha. The wormhole is the door to Beta.
               These robots fly that board. Solo is you and them. Quadrant adds whoever else is here.
             </p>
-            {!board?.players?.length ? (
+            {!shared || live.humans.length === 0 ? (
               <p className="mt-3 border border-line px-3 py-3 font-mono text-xs text-muted">
-                No other players yet. The robots are already out.
+                {shared ? live.status === "on the board" ? "No other players yet. The robots are already out." : live.status : "Solo. The robots are already out."}
               </p>
             ) : (
-              <p className="mt-3 font-mono text-xs text-amber">{arrival || "The list above is every human on this board."}</p>
+              <p className="mt-3 font-mono text-xs text-amber">{live.notice || "The list above is every human on this board."}</p>
             )}
             <p className="mt-2 text-sm text-muted">{QUADRANT_ROBOTS.join(" · ")}</p>
           </section>

@@ -64,6 +64,8 @@ export interface P2PRoomOptions {
   onHumans?: (humans: HumanRow[]) => void;
   /** Fires once, on the first successful signaling poll (registration). */
   onConnected?: () => void;
+  /** Fires when a poll fails, with a short reason. */
+  onStatus?: (message: string) => void;
 }
 
 interface PeerSlot {
@@ -219,9 +221,20 @@ export class P2PRoom {
     });
     const res = await fetch(`/api/rtc?${params}`);
     if (this.closed) return;
-    if (!res.ok) throw new Error(`signaling poll failed: ${res.status}`);
+    if (!res.ok) {
+      let detail = `board ${res.status}`;
+      try {
+        const err = (await res.json()) as { detail?: string };
+        if (err.detail) detail = err.detail.slice(0, 140);
+      } catch {
+        /* the status is enough */
+      }
+      this.opts.onStatus?.(detail);
+      throw new Error(detail);
+    }
     const body = (await res.json()) as RtcPollResponse;
     if (this.closed) return;
+    this.opts.onStatus?.("");
     if (!this.everPolled) {
       this.everPolled = true;
       this.opts.onConnected?.();

@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { introLive, sfx } from "@/game/audio";
+import { useEffect, useRef } from "react";
 
 type Props = {
   onEngage: () => void;
@@ -7,31 +6,16 @@ type Props = {
 
 export function TitleCard({ onEngage }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const heard = useRef(false);
-  const [sound, setSound] = useState(false);
-
-  const poke = () => {
-    const already = heard.current && introLive();
-    if (sfx.intro()) {
-      heard.current = true;
-      setSound(true);
-    }
-    return already;
-  };
 
   useEffect(() => {
-    poke();
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat) return;
       if (event.key !== "Enter" && event.key !== " " && event.key !== "Escape") return;
       event.preventDefault();
-      if (poke()) onEngage();
+      onEngage();
     };
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      sfx.stopIntro();
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onEngage]);
 
   useEffect(() => {
@@ -83,13 +67,7 @@ export function TitleCard({ onEngage }: Props) {
   }, []);
 
   return (
-    <div
-      className="relative h-dvh w-full overflow-hidden bg-black text-left"
-      onPointerDown={(event) => {
-        if ((event.target as HTMLElement).closest("button")) return;
-        poke();
-      }}
-    >
+    <div className="relative h-dvh w-full overflow-hidden bg-black text-left">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.2)_48%,#000_100%)]" />
       <img
@@ -109,13 +87,11 @@ export function TitleCard({ onEngage }: Props) {
       </div>
       <button
         type="button"
-        onClick={() => {
-          if (poke()) onEngage();
-        }}
+        onClick={onEngage}
         className="pulse-alert absolute bottom-[7%] left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.5em] text-amber"
-        aria-label={sound ? "Engage. Enter the shipyard." : "Start the title cue."}
+        aria-label="Engage. Enter the shipyard."
       >
-        {sound ? "ENGAGE" : "CLICK FOR SOUND"}
+        ENGAGE
       </button>
     </div>
   );

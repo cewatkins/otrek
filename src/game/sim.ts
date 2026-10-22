@@ -414,6 +414,16 @@ function makeShip(
   };
 }
 
+function quietLine(text: string) {
+  const t = text.toLowerCase();
+  return (
+    t.includes("vault updated") ||
+    t.includes("undock") ||
+    t.includes("docked at") ||
+    t.includes("relaunched from")
+  );
+}
+
 export class TrekSim {
   ships: Ship[] = [];
   player: Ship;
@@ -440,6 +450,9 @@ export class TrekSim {
   holeOpen = true;
   private holeLeft = 58;
   onBank: ((ship: Ship) => void) | null = null;
+  /** Last player strike on a remote, repeated on the pose so a dropped packet still lands. */
+  lastStrike: { to: string; dmg: number; n: number; by: string } | null = null;
+  private strikeSeq = 0;
   /** Fired when a local weapon tags a remote ship. Peer id, damage. */
   onStrike: ((peerId: string, raw: number) => void) | null = null;
   private edgeNote = 0;
@@ -517,8 +530,19 @@ export class TrekSim {
     return this.inputOverride ?? this.keys;
   }
 
+  verbose = false;
+
   say(text: string, tone: Line["tone"] = "info") {
+    if (!this.verbose && quietLine(text)) return;
     this.messages = [{ text, tone }, ...this.messages].slice(0, 8);
+  }
+
+  toggleVerbose() {
+    this.verbose = !this.verbose;
+    this.messages = [
+      { text: this.verbose ? "Full log on." : "Dock and vault lines hidden.", tone: "info" as const },
+      ...this.messages,
+    ].slice(0, 8);
   }
 
   baseById(id: string) {
@@ -727,7 +751,6 @@ export class TrekSim {
     if (!this.player.docked) return;
     this.player.docked = false;
     this.player.warp = 0;
-    this.say(`Undocking from ${this.player.dockName}.`, "info");
   }
 
   hail(text: string) {
@@ -1126,7 +1149,11 @@ export class TrekSim {
       }
       target.hitFlash = 0.18;
       const peer = target.id.startsWith("net:") ? target.id.slice(4) : "";
-      if (peer && attacker?.isPlayer) this.onStrike?.(peer, raw);
+      if (peer && attacker?.isPlayer) {
+        this.strikeSeq += 1;
+        this.lastStrike = { to: peer, dmg: raw, n: this.strikeSeq, by: attacker.name };
+        this.onStrike?.(peer, raw);
+      }
       return;
     }
     let left = raw;
@@ -1312,7 +1339,6 @@ export class TrekSim {
           const gained = this.goldAboard(ship);
           this.clearAboard(ship);
           ship.banked += gained;
-          this.say(`${ship.name} undocked, vault updated.`, "info");
         }
       }
     }

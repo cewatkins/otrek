@@ -49,6 +49,7 @@ let introTimer: ReturnType<typeof setTimeout> | null = null;
 let introBus: GainNode | null = null;
 let introOn = false;
 
+const introNodes: OscillatorNode[] = [];
 const PHRASE = [196, 247, 294, 392, 494, 392, 330, 247];
 
 function toneAt(freq: number, when: number, dur: number, type: OscillatorType, gain: number, dest: AudioNode) {
@@ -62,6 +63,11 @@ function toneAt(freq: number, when: number, dur: number, type: OscillatorType, g
   amp.gain.exponentialRampToValueAtTime(0.0001, when + dur);
   osc.connect(amp);
   amp.connect(dest);
+  introNodes.push(osc);
+  osc.onended = () => {
+    const i = introNodes.indexOf(osc);
+    if (i >= 0) introNodes.splice(i, 1);
+  };
   osc.start(when);
   osc.stop(when + dur + 0.05);
 }
@@ -101,14 +107,22 @@ export const sfx = {
     introOn = false;
     if (introTimer) clearTimeout(introTimer);
     introTimer = null;
-    if (!ctx || !introBus) return;
-    const bus = introBus;
-    introBus = null;
-    const now = ctx.currentTime;
-    bus.gain.cancelScheduledValues(now);
-    bus.gain.setValueAtTime(Math.max(0.0001, bus.gain.value), now);
-    bus.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
-    setTimeout(() => bus.disconnect(), 450);
+    for (const osc of introNodes) {
+      try {
+        osc.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    introNodes.length = 0;
+    if (introBus) {
+      try {
+        introBus.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+      introBus = null;
+    }
   },
   phaser() {
     tone(980, 0.16, "sawtooth", 0.045, -720);
