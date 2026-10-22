@@ -65,7 +65,7 @@ export function saveCallsign(name: string, classId: string) {
 export function saveScore(row: ScoreRow): ScoreRow[] {
   const data = read();
   const existing = data.scores.find((s) => s.name === row.name && s.code === row.code);
-  if (existing && existing.gold >= row.gold && (existing.breaks ?? 0) <= (row.breaks ?? 0)) return data.scores;
+  if (existing && existing.gold >= row.gold && (existing.breaks ?? 0) >= (row.breaks ?? 0)) return data.scores;
   data.scores = [row, ...data.scores.filter((s) => !(s.name === row.name && s.code === row.code))]
     .sort((a, b) => b.gold - a.gold)
     .slice(0, 8);

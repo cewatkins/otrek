@@ -37,14 +37,14 @@ export function NetLink({ name, simRef, sendRef }: Props) {
       const n = Number(msg.hit.n) || 0;
       if (n > (heardHits.current.get(msg.id) ?? 0)) {
         heardHits.current.set(msg.id, n);
-        sim.applyIncoming(Number(msg.hit.dmg) || 0, String(msg.hit.by ?? msg.name ?? "someone"));
+        sim.applyIncoming(Number(msg.hit.dmg) || 0, msg.id);
       }
     }
     if (msg.kind === "hit" && msg.to === selfId) {
       const n = Number(msg.n) || 0;
       if (n === 0 || n > (heardHits.current.get(msg.id) ?? 0)) {
         if (n) heardHits.current.set(msg.id, n);
-        sim.applyIncoming(Number(msg.dmg) || 0, String(msg.by ?? "someone"));
+        sim.applyIncoming(Number(msg.dmg) || 0, msg.id);
       }
     }
     if (typeof msg.x === "number" && typeof msg.y === "number") sim.upsertRemote(msg.id, msg);

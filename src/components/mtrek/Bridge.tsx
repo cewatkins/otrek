@@ -218,6 +218,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
     window.addEventListener("pagehide", hide);
+    window.addEventListener("beforeunload", hide);
 
     return () => {
       cancelAnimationFrame(raf);
@@ -226,6 +227,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
       window.removeEventListener("pagehide", hide);
+      window.removeEventListener("beforeunload", hide);
       delete window.__controlsTest;
     };
   }, [name, classId, bots]);

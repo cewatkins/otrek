@@ -1,15 +1,23 @@
-/** mtrek terrain and fuel rules, in the scaled chart. Pure, so the sim can be tested without a browser. */
+/** mtrek terrain and fuel rules. Effect distances use the same scale as ship scan, not the chart sprite. */
 
 export type Terrain = "nebula" | "asteroid" | "quasar" | "pulsar" | "cygnus";
 
-/** Visual radius on the chart was raw size times the quadrant scale. Recover a raw distance the same way. */
-const VISUAL_RAW: Record<Terrain, number> = {
-  nebula: 4500,
-  asteroid: 5000,
-  quasar: 900,
-  pulsar: 900,
-  cygnus: 900,
-};
+/**
+ * Excelsior scan is 10,000 on the sheet and 4,800 in this chart.
+ * Nebula scan, quasar and pulsar fields, and the Cygnus pull use this factor.
+ */
+export const RANGE_SCALE = 4800 / 10000;
+
+/** World units for a raw mtrek distance, matching ship weapon and scan scale. */
+export function rangeUnits(raw: number) {
+  return raw * RANGE_SCALE;
+}
+
+function nameHash(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 33 + name.charCodeAt(i)) >>> 0;
+  return h;
+}
 
 export function terrainOf(name: string): Terrain | null {
   const n = name.toLowerCase();
@@ -21,26 +29,25 @@ export function terrainOf(name: string): Terrain | null {
   return null;
 }
 
-/** World units for an original raw radius, using this body's own chart scale. */
-export function rawToWorld(terrain: Terrain, visualR: number, raw: number) {
-  const scale = visualR / VISUAL_RAW[terrain];
-  return raw * scale;
+/** Quasars damp a cloak out to 1,000 or 1,500 raw. Pulsars 1,000 or 2,000. The name picks which. */
+export function effectRaw(name: string, terrain: "quasar" | "pulsar") {
+  const h = nameHash(name);
+  if (terrain === "quasar") return h % 2 === 0 ? 1000 : 1500;
+  return h % 2 === 0 ? 1000 : 2000;
 }
 
 export function pulsarCloaking(name: string, t: number) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 33 + name.charCodeAt(i)) >>> 0;
-  return (t + (h % 17)) % 24 < 12;
+  return (t + (nameHash(name) % 17)) % 24 < 12;
 }
 
-/** Scan inside a nebula is 1000 raw units. Visibility of a ship in a nebula is a third of normal. */
-export function nebulaScan(visualR: number, normalScan: number) {
-  return Math.min(normalScan, rawToWorld("nebula", visualR, 1000));
+/** Scan inside a nebula is 1,000 raw units: 480 at ship scale, inside an Excelsior's torpedo reach. */
+export function nebulaScan(normalScan: number) {
+  return Math.min(normalScan, rangeUnits(1000));
 }
 
-export function seenRange(normalScan: number, observerInNebula: boolean, targetInNebula: boolean, nebulaR: number) {
+export function seenRange(normalScan: number, observerInNebula: boolean, targetInNebula: boolean) {
   let scan = normalScan;
-  if (observerInNebula) scan = nebulaScan(nebulaR, normalScan);
+  if (observerInNebula) scan = nebulaScan(normalScan);
   if (targetInNebula) scan = Math.min(scan, normalScan / 3);
   return scan;
 }
@@ -54,6 +61,7 @@ export function crystalBurn(warp: number, cruise: number, dt: number) {
 /**
  * Antimatter is fuel. Warp-energy spent per tick piles up; every 400 becomes one unit.
  * Impulse (the free part) is 40. Four ticks a second, matching the mtrek note.
+ * Warp 16 with shields spends 0.5 a second, so a 5,000 tank lasts about 2.7 hours.
  */
 export function antimatterUsed(warp: number, shieldsUp: boolean, cloaked: boolean, dt: number) {
   const perTick = Math.max(0, Math.abs(warp) * 5 + (shieldsUp ? 10 : 0) + (cloaked ? 15 : 0) - 40);
@@ -77,7 +85,7 @@ export function garble(text: string, mark: "#" | "@") {
 }
 
 /**
- * Breaksave penalty. Under 1000 gold the ship is lost.
+ * Breaksave penalty. Under 1000 gold the ship is lost and the bank goes with it.
  * Otherwise about a third of the gold is taken, and a tenth is left on the field.
  */
 export function breaksaveTake(gold: number) {

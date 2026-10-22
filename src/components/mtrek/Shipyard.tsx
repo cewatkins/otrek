@@ -313,6 +313,11 @@ export function Shipyard({ onStart }: Props) {
             </section>
             <section>
               <h3 className="font-mono text-xs tracking-widest text-muted">FLEET BOARD</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                The vault on this board is the one that counts. Dock to bank it. Leave a fight and the
+                breaksave posts here too: under 1,000 gold the bank is forfeit, otherwise the vault is cut
+                by a third.
+              </p>
               <div className="mt-2 min-h-16">
                 <SignInGate
                   fallback={

@@ -5,10 +5,11 @@ import {
   antimatterUsed,
   countsAsFight,
   crystalBurn,
+  effectRaw,
   garble,
   hullTear,
   pulsarCloaking,
-  rawToWorld,
+  rangeUnits,
   seenRange,
   terrainOf,
   breaksaveTake,
@@ -151,8 +152,8 @@ export type Ship = {
   amAcc: number;
   /** Breaksaves. Leaving a fight under 1,000 gold loses the ship. */
   breaks: number;
-  /** Who has actually shot this ship. Gold requires a shot back from a human. */
-  fought: Set<string>;
+  /** Who shot this ship, and when. Gold from a human needs a hit back inside 30 seconds. */
+  foughtAt: Map<string, number>;
   /** Another player's ship. Pose comes from them; this client does not fly it. */
   remote: boolean;
   /** Alpha is where every ship starts. Wormholes cycle Alpha, Beta, Gamma, Omega. */
@@ -431,7 +432,7 @@ function makeShip(
     antimatter: 5000,
     amAcc: 0,
     breaks: 0,
-    fought: new Set(),
+    foughtAt: new Map(),
     remote: false,
     quad: "A",
   };
@@ -500,7 +501,8 @@ export class TrekSim {
   private farmNote = 0;
   private lastCombat = -100;
   private broke = false;
-  private hitTimes = new Map<string, number[]>();
+  /** Last accepted hit time per remote, per weapon. Stops a client spraying damage. */
+  private weaponAt = new Map<string, { phaser: number; torp: number; drone: number; mine: number }>();
 
   constructor(name: string, classId: string, opts?: { bots?: boolean }) {
     const cls = classById(classId);
@@ -629,11 +631,11 @@ export class TrekSim {
       const d = this.dist(ship.x, ship.y, spot.x, spot.y, ship.z, spot.z);
       const reach =
         kind === "quasar"
-          ? rawToWorld("quasar", spot.r, 1250)
+          ? rangeUnits(effectRaw(spot.name, "quasar"))
           : kind === "pulsar"
-            ? rawToWorld("pulsar", spot.r, 1500)
+            ? rangeUnits(effectRaw(spot.name, "pulsar"))
             : kind === "cygnus"
-              ? rawToWorld("cygnus", spot.r, 10000)
+              ? rangeUnits(10000)
               : spot.r;
       if (d < reach && d < bestD) {
         best = spot;
@@ -658,17 +660,18 @@ export class TrekSim {
   }
 
   private payForHit(attacker: Ship, target: Ship, raw: number) {
-    const back = attacker.fought.has(target.id);
+    const last = attacker.foughtAt.get(target.id) ?? -1e9;
+    const back = this.t - last <= 30;
     if (!countsAsFight(target.remote, back)) {
       if (attacker.isPlayer && this.t > this.farmNote) {
         this.farmNote = this.t + 6;
-        this.say("No gold. They never fired back. That is pointshipping.", "alert");
+        this.say("No gold. No return fire in the last 30 seconds. That is pointshipping.", "alert");
       }
     } else {
       attacker.pendingDmg += raw;
       if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * 0.5;
     }
-    target.fought.add(attacker.id);
+    target.foughtAt.set(attacker.id, this.t);
     if (attacker.isPlayer || target.isPlayer) this.lastCombat = this.t;
   }
 
@@ -737,7 +740,12 @@ export class TrekSim {
     ship.quad = pose.quad && QUAD_ORDER.includes(pose.quad) ? pose.quad : ship.quad;
     ship.alive = true;
     ship.name = String(pose.name ?? ship.name).slice(0, 18);
-    if (pose.classId && pose.classId !== ship.cls.id) ship.cls = classById(String(pose.classId));
+    if (pose.classId && pose.classId !== ship.cls.id) {
+      ship.cls = classById(String(pose.classId));
+      ship.magazine = ship.cls.magazine;
+      ship.drones = ship.cls.drones ?? 0;
+      ship.mines = ship.cls.mines ?? 0;
+    }
     ship.x = x;
     ship.y = y;
     ship.z = z;
@@ -747,6 +755,11 @@ export class TrekSim {
     ship.hull = clamp(Number(pose.hull) || 0, 0, ship.cls.hull);
     ship.cloaked = Boolean(pose.cloaked);
     ship.docked = Boolean(pose.docked);
+    if (ship.docked) {
+      ship.magazine = ship.cls.magazine;
+      ship.drones = ship.cls.drones ?? 0;
+      ship.mines = ship.cls.mines ?? 0;
+    }
   }
 
   /** Humans take a, b, c in the same order on every screen. Robots follow. */
@@ -780,21 +793,65 @@ export class TrekSim {
     }
   }
 
-  applyIncoming(raw: number, byName: string) {
-    if (!this.player.alive || this.over) return;
-    const name = byName.slice(0, 24);
+  /**
+   * A remote hit has to match a weapon that ship can actually fire.
+   * Peer id, not the display name. Pose lag gets some slack; the quadrant does not.
+   * Mines are left behind, so they are not tied to where the ship is now.
+   */
+  applyIncoming(raw: number, peerId: string) {
+    if (!this.player.alive || this.over || raw <= 0) return;
+    const id = peerId.startsWith("net:") ? peerId : `net:${peerId}`;
+    const ghost = this.ships.find((s) => s.id === id);
+    if (!ghost || !ghost.alive || ghost.quad !== this.player.quad) return;
+    const d = this.dist(ghost.x, ghost.y, this.player.x, this.player.y, ghost.z, this.player.z);
+    const cls = ghost.cls;
     const now = this.t;
-    const recent = (this.hitTimes.get(name) ?? []).filter((at) => now - at < 1);
-    if (recent.length >= 8) return;
-    recent.push(now);
-    this.hitTimes.set(name, recent);
-    const ghost = this.ships.find((s) => s.remote && s.name === name) ?? null;
-    if (!ghost || ghost.quad !== this.player.quad) return;
-    const reach = Math.max(ghost.cls.phaserRange, ghost.cls.torpMax, 1600) + 500;
-    if (this.dist(ghost.x, ghost.y, this.player.x, this.player.y, ghost.z, this.player.z) > reach) return;
-    const dmg = Math.max(0, Math.min(220, raw));
+    const slack = 800;
+    const clock = this.weaponAt.get(id) ?? { phaser: -99, torp: -99, drone: -99, mine: -99 };
+    const fits: { kind: "phaser" | "torp" | "drone" | "mine"; cap: number }[] = [];
+    const phaserCd = cls.esi ? 1.7 : 1.12;
+    if (d <= cls.phaserRange + slack && now - clock.phaser >= phaserCd - 0.05) {
+      if (!cls.agonizer || ghost.magazine > 0) fits.push({ kind: "phaser", cap: cls.phaser });
+    }
+    if (
+      ghost.magazine > 0 &&
+      d <= cls.torpMax + slack &&
+      d >= Math.max(0, cls.torpMin - slack) &&
+      now - clock.torp >= cls.torpCd - 0.05
+    ) {
+      fits.push({ kind: "torp", cap: cls.torpDmg });
+    }
+    const droneDmg = cls.droneDmg ?? 0;
+    if ((cls.drones ?? 0) > 0 && ghost.drones > 0 && droneDmg > 0 && d <= 1600 + slack && now - clock.drone >= 1.65) {
+      fits.push({ kind: "drone", cap: droneDmg });
+    }
+    const mineDmg = cls.mineDmg ?? 0;
+    if ((cls.mines ?? 0) > 0 && ghost.mines > 0 && mineDmg > 0 && now - clock.mine >= 1.35) {
+      fits.push({ kind: "mine", cap: mineDmg });
+    }
+    if (fits.length === 0) return;
+    const covering = fits.filter((f) => raw <= f.cap + 0.5);
+    const pick = covering.length
+      ? covering.reduce((a, b) => (a.cap < b.cap ? a : b))
+      : fits.reduce((a, b) => (a.cap > b.cap ? a : b));
+    const dmg = Math.min(pick.cap, raw);
+    if (dmg <= 0) return;
+    if (pick.kind === "phaser") {
+      clock.phaser = now;
+      if (cls.agonizer) ghost.magazine = Math.max(0, ghost.magazine - 1);
+    } else if (pick.kind === "torp") {
+      clock.torp = now;
+      ghost.magazine = Math.max(0, ghost.magazine - 1);
+    } else if (pick.kind === "drone") {
+      clock.drone = now;
+      ghost.drones = Math.max(0, ghost.drones - 1);
+    } else {
+      clock.mine = now;
+      ghost.mines = Math.max(0, ghost.mines - 1);
+    }
+    this.weaponAt.set(id, clock);
     this.applyDamage(this.player, dmg, ghost);
-    this.say(`${name} hits for ${Math.round(dmg)}.`, "alert");
+    this.say(`${ghost.name} hits for ${Math.round(dmg)}.`, "alert");
   }
 
   visible(observer: Ship, target: Ship) {
@@ -803,12 +860,10 @@ export class TrekSim {
     const d = this.dist(observer.x, observer.y, target.x, target.y, observer.z, target.z);
     const nebO = this.nebulaAt(observer);
     const nebT = this.nebulaAt(target);
-    const scan = seenRange(observer.cls.scan, Boolean(nebO), Boolean(nebT), (nebO ?? nebT)?.r ?? 450);
-    if (d > scan && !(observer.quad === target.quad && target.remote && !nebO && !nebT)) return false;
-    if (target.remote && !nebO && !nebT && !target.cloaked) return true;
+    const scan = seenRange(observer.cls.scan, Boolean(nebO), Boolean(nebT));
+    if (d > scan) return false;
     const cloaked = target.cloaked && !target.docked && !this.cloakDead(target);
     if (cloaked && d > 320 && target !== observer) return false;
-    if (d > scan) return false;
     return true;
   }
 
@@ -1622,12 +1677,9 @@ export class TrekSim {
     if (ship.isPlayer) {
       this.over = true;
       this.killedBy = by;
-      this.say(
-        dropped > 0
-          ? `${dropped} gold left on the field. Vault still holds ${Math.floor(ship.banked)}.`
-          : `Vault still holds ${Math.floor(ship.banked)}.`,
-        "alert",
-      );
+      const vault = Math.floor(ship.banked);
+      const vaultLine = vault > 0 ? `Vault still holds ${vault}.` : "Vault is empty.";
+      this.say(dropped > 0 ? `${dropped} gold left on the field. ${vaultLine}` : vaultLine, "alert");
     } else {
       ship.respawn = this.t + 18;
     }
@@ -2105,22 +2157,16 @@ export class TrekSim {
       const kind = terrainOf(spot.name);
       if (kind !== "asteroid" && kind !== "cygnus") continue;
       const d = this.dist(ship.x, ship.y, spot.x, spot.y, ship.z, spot.z);
-      if (kind === "asteroid" && d < spot.r && Math.abs(ship.warp) > 8) {
-        const hit = 10 * dt;
-        if (ship.shield > 0) ship.shield = Math.max(0, ship.shield - hit);
-        else ship.hull -= hit;
+      if (kind === "asteroid" && d < spot.r && Math.abs(ship.warp) > 8 && ship.shield > 0) {
+        ship.shield = Math.max(0, ship.shield - Math.min(ship.shield, 10 * dt));
         if (ship.isPlayer && this.t > this.edgeNote) {
           this.edgeNote = this.t + 3;
           this.say("Asteroids. Warp 8 or less, or they eat the shields.", "alert");
         }
-        if (ship.hull <= 0) {
-          this.destroy(ship, null);
-          return;
-        }
       }
       if (kind === "cygnus") {
-        const pullR = rawToWorld("cygnus", spot.r, 10000);
-        const core = rawToWorld("cygnus", spot.r, 500);
+        const pullR = rangeUnits(10000);
+        const core = rangeUnits(500);
         if (d < core && ship.holeCd <= 0) this.dumpFromCygnus(ship);
         else if (d < pullR && d > 1) {
           const pull = (1 - d / pullR) ** 2 * 520 * dt;
@@ -2155,7 +2201,9 @@ export class TrekSim {
     const take = breaksaveTake(gold);
     p.breaks += 1;
     if (take.destroy) {
-      this.say("Breaksave under 1,000 gold. The ship is lost.", "alert");
+      p.cargo += p.banked;
+      p.banked = 0;
+      this.say("Breaksave under 1,000 gold. The ship is lost, and the vault with it.", "alert");
       this.destroy(p, null);
       this.onBank?.(p);
       return;
@@ -2214,7 +2262,7 @@ export class TrekSim {
     }
     const roster: RosterRow[] = this.ships.map((s) => {
       const same = s.quad === p.quad;
-      const seen = s.isPlayer || (s.alive && (s.remote || this.visible(p, s)));
+      const seen = s.isPlayer || (s.alive && same && this.visible(p, s));
       return {
         id: s.id,
         letter: s.letter,

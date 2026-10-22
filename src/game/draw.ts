@@ -573,7 +573,7 @@ function drawLongRange(ctx: CanvasRenderingContext2D, sim: TrekSim, pane: Pane) 
   }
   for (const ship of sim.ships) {
     if (!ship.alive || ship.quad !== quad) continue;
-    if (!ship.isPlayer && !ship.remote && !sim.visible(sim.player, ship)) continue;
+    if (!ship.isPlayer && !sim.visible(sim.player, ship)) continue;
     const p = m(ship.x, ship.y);
     ctx.fillStyle = ship.isPlayer ? GOLD : ship.remote ? "#7ee0ff" : ALERT;
     ctx.fillRect(p.x - 2, p.y - 2, 4, 4);

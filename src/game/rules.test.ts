@@ -5,11 +5,12 @@ import {
   breaksaveTake,
   countsAsFight,
   crystalBurn,
+  effectRaw,
   garble,
   hullTear,
   nebulaScan,
   pulsarCloaking,
-  rawToWorld,
+  rangeUnits,
   seenRange,
   terrainOf,
 } from "./rules.ts";
@@ -24,19 +25,24 @@ test("terrain names", () => {
   assert.equal(terrainOf("Earth"), null);
 });
 
-test("nebula scan is the scaled 1000, and a ship inside is harder to see", () => {
-  const scan = nebulaScan(450, 4800);
-  assert.ok(scan < 200);
-  assert.ok(scan > 50);
-  const seen = seenRange(4800, false, true, 450);
-  assert.equal(seen, 1600);
-  const inside = seenRange(4800, true, false, 450);
-  assert.ok(inside < 200);
+test("nebula scan uses ship scale, and a ship inside is harder to see", () => {
+  assert.equal(rangeUnits(1000), 480);
+  assert.equal(nebulaScan(4800), 480);
+  assert.equal(seenRange(4800, false, true), 1600);
+  assert.equal(seenRange(4800, true, false), 480);
+  assert.equal(rangeUnits(10000), 4800);
+  assert.equal(rangeUnits(500), 240);
 });
 
-test("quasar radius scales with the chart", () => {
-  const r = rawToWorld("quasar", 90, 1000);
-  assert.ok(Math.abs(r - 100) < 1);
+test("quasar and pulsar fields use ship scale, not the chart sprite", () => {
+  assert.equal(rangeUnits(1000), 480);
+  assert.equal(rangeUnits(1500), 720);
+  assert.equal(rangeUnits(2000), 960);
+  const quasar = effectRaw("Quasar 3C 273", "quasar");
+  const pulsar = effectRaw("Vela Pulsar", "pulsar");
+  assert.ok(quasar === 1000 || quasar === 1500);
+  assert.ok(pulsar === 1000 || pulsar === 2000);
+  assert.equal(effectRaw("Quasar 3C 273", "quasar"), quasar);
 });
 
 test("pulsar cloak damping turns on and off", () => {
@@ -50,15 +56,17 @@ test("crystal burn is four per second per warp over cruise", () => {
   assert.equal(crystalBurn(13, 13, 1), 0);
 });
 
-test("antimatter drains only past impulse, and hull tears at damage warp", () => {
+test("antimatter at warp 16 with shields is half a unit a second", () => {
   assert.equal(antimatterUsed(0, false, false, 1), 0);
-  assert.ok(antimatterUsed(16, true, false, 1) > 0);
+  assert.equal(antimatterUsed(16, true, false, 1), 0.5);
   assert.equal(hullTear(14, 17, 1), 0);
   assert.ok(hullTear(17, 17, 1) > 0);
 });
 
 test("breaksave and pointshipping", () => {
-  assert.equal(breaksaveTake(400).destroy, true);
+  const poor = breaksaveTake(400);
+  assert.equal(poor.destroy, true);
+  assert.equal(poor.kept, 0);
   const rich = breaksaveTake(3000);
   assert.equal(rich.destroy, false);
   assert.ok(rich.kept < 3000);
