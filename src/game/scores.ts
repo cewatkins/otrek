@@ -5,6 +5,7 @@ export type ScoreRow = {
   dmg: number;
   kills: number;
   at: number;
+  breaks?: number;
 };
 
 const KEY = "otrek-web-v1";
@@ -64,10 +65,33 @@ export function saveCallsign(name: string, classId: string) {
 export function saveScore(row: ScoreRow): ScoreRow[] {
   const data = read();
   const existing = data.scores.find((s) => s.name === row.name && s.code === row.code);
-  if (existing && existing.gold >= row.gold) return data.scores;
+  if (existing && existing.gold >= row.gold && (existing.breaks ?? 0) <= (row.breaks ?? 0)) return data.scores;
   data.scores = [row, ...data.scores.filter((s) => !(s.name === row.name && s.code === row.code))]
     .sort((a, b) => b.gold - a.gold)
     .slice(0, 8);
   write(data);
   return data.scores;
+}
+
+const MAP_KEY = "otrek-keymaps-v1";
+
+export function loadKeymaps(): Record<string, string> {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(MAP_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "string" && value.length > 0 && value.length < 49) out[key] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function saveKeymaps(map: Record<string, string>) {
+  localStorage.setItem(MAP_KEY, JSON.stringify(map));
 }

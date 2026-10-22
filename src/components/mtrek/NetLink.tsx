@@ -12,14 +12,14 @@ type Props = {
 
 export function NetLink({ name, simRef, sendRef }: Props) {
   const [selfId] = useState(() => `p-${Math.random().toString(36).slice(2, 10)}`);
-  const hailRef = useRef<{ text: string; n: number } | null>(null);
+  const hailRef = useRef<{ text: string; n: number; to?: string | null } | null>(null);
   const heardHits = useRef(new Map<string, number>());
   const heardHail = useRef(new Map<string, number>());
 
   const hear = (from: string, text: string, n: number) => {
     if (!text || !n || heardHail.current.get(from) === n) return;
     heardHail.current.set(from, n);
-    simRef.current?.say(text.slice(0, 96), "hail");
+    simRef.current?.hearHail(text.slice(0, 96));
   };
 
   const onMessage = (msg: BoardMsg) => {
@@ -48,7 +48,11 @@ export function NetLink({ name, simRef, sendRef }: Props) {
       }
     }
     if (typeof msg.x === "number" && typeof msg.y === "number") sim.upsertRemote(msg.id, msg);
-    if (msg.hail?.text) hear(msg.id, String(msg.hail.text), Number(msg.hail.n) || 0);
+    if (msg.hail?.text) {
+      const to = msg.hail.to;
+      if (to && to !== selfId) return;
+      hear(msg.id, String(msg.hail.text), Number(msg.hail.n) || 0);
+    }
   };
 
   const board = useBoard(selfId, name, true, true, onMessage);
@@ -58,7 +62,7 @@ export function NetLink({ name, simRef, sendRef }: Props) {
       if (!data || typeof data !== "object") return;
       const msg = data as { k?: string; text?: string; n?: number; to?: string; dmg?: number; by?: string };
       if (msg.k === "hail" && msg.text) {
-        hailRef.current = { text: msg.text, n: Number(msg.n) || Date.now() };
+        hailRef.current = { text: msg.text, n: Number(msg.n) || Date.now(), to: msg.to };
         board.publish({ hail: hailRef.current });
       }
       if (msg.k === "hit" && msg.to) board.publish({ kind: "hit", to: msg.to, dmg: msg.dmg, by: msg.by });

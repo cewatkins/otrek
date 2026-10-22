@@ -1,6 +1,18 @@
 import { sfx } from "@/game/audio";
 import { CHART, type ChartRow } from "@/game/chart";
-import { classById, type ShipClass } from "@/game/classes";
+import { classById, SHEETS, type ShipClass } from "@/game/classes";
+import {
+  antimatterUsed,
+  countsAsFight,
+  crystalBurn,
+  garble,
+  hullTear,
+  pulsarCloaking,
+  rawToWorld,
+  seenRange,
+  terrainOf,
+  breaksaveTake,
+} from "@/game/rules";
 
 export const WORLD = 9000;
 const WARP_SPEED = 78;
@@ -21,6 +33,7 @@ export type Spot = {
   quad: Quad;
   dock: boolean;
   feed: boolean;
+  code: string;
 };
 export type Base = Spot;
 export type Planet = Spot;
@@ -130,8 +143,16 @@ export type Ship = {
   goalWarp: number;
   goalZ: number;
   missNote: number;
-  /** Dilithium still in the hold. Soaks damage that gets through shields. */
+  /** Dilithium still in the hold. Soaks damage that gets through shields, and overwarp burns it. */
   crystals: number;
+  crystalAcc: number;
+  /** Fuel. Warp energy cannot rise above whatever antimatter is left. */
+  antimatter: number;
+  amAcc: number;
+  /** Breaksaves. Leaving a fight under 1,000 gold loses the ship. */
+  breaks: number;
+  /** Who has actually shot this ship. Gold requires a shot back from a human. */
+  fought: Set<string>;
   /** Another player's ship. Pose comes from them; this client does not fly it. */
   remote: boolean;
   /** Alpha is where every ship starts. Wormholes cycle Alpha, Beta, Gamma, Omega. */
@@ -172,10 +193,13 @@ export type Snapshot = {
   t: number;
   warp: number;
   maxWarp: number;
+  damageWarp: number;
   heading: number;
   z: number;
   energy: number;
   energyMax: number;
+  antimatter: number;
+  breaks: number;
   shield: number;
   hull: number;
   hullMax: number;
@@ -246,6 +270,7 @@ export const SPOTS: Spot[] = CHART.map((row) => ({
   quad: row.quad,
   dock: row.dock,
   feed: row.feed,
+  code: row.code,
 }));
 export const BASES: Base[] = SPOTS.filter((spot) => spot.dock && spot.kind !== "hole");
 export const PLANETS: Planet[] = SPOTS.filter((spot) => !spot.dock && spot.kind !== "hole");
@@ -402,6 +427,11 @@ function makeShip(
     goalZ: partial.z,
     missNote: 0,
     crystals: cls.crystals ?? 0,
+    crystalAcc: 0,
+    antimatter: 5000,
+    amAcc: 0,
+    breaks: 0,
+    fought: new Set(),
     remote: false,
     quad: "A",
   };
@@ -448,6 +478,11 @@ export class TrekSim {
   aiPilot = false;
   /** Click on the long-range chart. The ship flies to this point. */
   nav: { x: number; y: number; z: number } | null = null;
+  /** `[` picks a key. The hail line is the macro. `]` clears one. */
+  keymaps: Record<string, string> = {};
+  pendingMap = "";
+  mapPhase: "idle" | "pick" | "clear" = "idle";
+  onHail: ((msg: { text: string; to: string | null }) => void) | null = null;
   private threatId: string | null = null;
   private threatUntil = 0;
   /** mtrek.com wormholes sit dark for about a minute, then open again. */
@@ -462,6 +497,10 @@ export class TrekSim {
   private edgeNote = 0;
   private noTgt = 0;
   private warpNote = 0;
+  private farmNote = 0;
+  private lastCombat = -100;
+  private broke = false;
+  private hitTimes = new Map<string, number[]>();
 
   constructor(name: string, classId: string, opts?: { bots?: boolean }) {
     const cls = classById(classId);
@@ -549,7 +588,7 @@ export class TrekSim {
       }
       return;
     }
-    const next = dir > 0 ? Math.min(p.cls.maxWarp, p.warp + 0.4) : Math.max(-2, p.warp - 0.4);
+    const next = dir > 0 ? Math.min(this.tearOf(p), p.warp + 0.4) : Math.max(-2, p.warp - 0.4);
     p.warp = Math.round(next * 10) / 10;
   }
 
@@ -575,6 +614,62 @@ export class TrekSim {
 
   dist(ax: number, ay: number, bx: number, by: number, az = 0, bz = 0) {
     return Math.hypot(ax - bx, ay - by, az - bz);
+  }
+
+  /** Cruising cap is maxWarp. The sheet's damage warp is as fast as the hull will go. */
+  tearOf(ship: Ship) {
+    return SHEETS[ship.cls.id]?.damageWarp ?? ship.cls.maxWarp;
+  }
+
+  private spotNear(ship: Ship, kind: ReturnType<typeof terrainOf>) {
+    let best: Spot | null = null;
+    let bestD = Infinity;
+    for (const spot of SPOTS) {
+      if (spot.quad !== ship.quad || terrainOf(spot.name) !== kind) continue;
+      const d = this.dist(ship.x, ship.y, spot.x, spot.y, ship.z, spot.z);
+      const reach =
+        kind === "quasar"
+          ? rawToWorld("quasar", spot.r, 1250)
+          : kind === "pulsar"
+            ? rawToWorld("pulsar", spot.r, 1500)
+            : kind === "cygnus"
+              ? rawToWorld("cygnus", spot.r, 10000)
+              : spot.r;
+      if (d < reach && d < bestD) {
+        best = spot;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  private nebulaAt(ship: Ship) {
+    return this.spotNear(ship, "nebula");
+  }
+
+  private cloakDead(ship: Ship) {
+    if (this.spotNear(ship, "quasar")) return true;
+    const pulsar = this.spotNear(ship, "pulsar");
+    return Boolean(pulsar && pulsarCloaking(pulsar.name, this.t));
+  }
+
+  private interference(ship: Ship) {
+    return Boolean(this.nebulaAt(ship) || this.spotNear(ship, "quasar") || this.spotNear(ship, "pulsar"));
+  }
+
+  private payForHit(attacker: Ship, target: Ship, raw: number) {
+    const back = attacker.fought.has(target.id);
+    if (!countsAsFight(target.remote, back)) {
+      if (attacker.isPlayer && this.t > this.farmNote) {
+        this.farmNote = this.t + 6;
+        this.say("No gold. They never fired back. That is pointshipping.", "alert");
+      }
+    } else {
+      attacker.pendingDmg += raw;
+      if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * 0.5;
+    }
+    target.fought.add(attacker.id);
+    if (attacker.isPlayer || target.isPlayer) this.lastCombat = this.t;
   }
 
   shipById(id: string | null) {
@@ -687,19 +782,33 @@ export class TrekSim {
 
   applyIncoming(raw: number, byName: string) {
     if (!this.player.alive || this.over) return;
-    const dmg = Math.max(0, Math.min(500, raw));
-    const ghost = this.ships.find((s) => s.remote && s.name === byName) ?? null;
+    const name = byName.slice(0, 24);
+    const now = this.t;
+    const recent = (this.hitTimes.get(name) ?? []).filter((at) => now - at < 1);
+    if (recent.length >= 8) return;
+    recent.push(now);
+    this.hitTimes.set(name, recent);
+    const ghost = this.ships.find((s) => s.remote && s.name === name) ?? null;
+    if (!ghost || ghost.quad !== this.player.quad) return;
+    const reach = Math.max(ghost.cls.phaserRange, ghost.cls.torpMax, 1600) + 500;
+    if (this.dist(ghost.x, ghost.y, this.player.x, this.player.y, ghost.z, this.player.z) > reach) return;
+    const dmg = Math.max(0, Math.min(220, raw));
     this.applyDamage(this.player, dmg, ghost);
-    this.say(`${byName} hits for ${Math.round(dmg)}.`, "alert");
+    this.say(`${name} hits for ${Math.round(dmg)}.`, "alert");
   }
 
   visible(observer: Ship, target: Ship) {
     if (!target.alive) return false;
-    if (observer.quad === target.quad && target.remote) return true;
     if (observer.quad !== target.quad) return false;
     const d = this.dist(observer.x, observer.y, target.x, target.y, observer.z, target.z);
-    if (d > observer.cls.scan) return false;
-    if (target.cloaked && !target.docked && d > 320 && target !== observer) return false;
+    const nebO = this.nebulaAt(observer);
+    const nebT = this.nebulaAt(target);
+    const scan = seenRange(observer.cls.scan, Boolean(nebO), Boolean(nebT), (nebO ?? nebT)?.r ?? 450);
+    if (d > scan && !(observer.quad === target.quad && target.remote && !nebO && !nebT)) return false;
+    if (target.remote && !nebO && !nebT && !target.cloaked) return true;
+    const cloaked = target.cloaked && !target.docked && !this.cloakDead(target);
+    if (cloaked && d > 320 && target !== observer) return false;
+    if (d > scan) return false;
     return true;
   }
 
@@ -930,18 +1039,52 @@ export class TrekSim {
   }
 
   hail(text: string) {
-    const msg = text.trim().slice(0, 80);
-    if (!msg) return;
-    this.say(`${this.player.name}: ${msg}`, "hail");
-    const foe = this.ships.find((s) => s.alive && !s.isPlayer && !s.docked);
-    if (!foe) return;
-    const lines = [
-      `${foe.name}: Save it for the debris field.`,
-      `${foe.name}: Noted. I still intend to shoot you.`,
-      `${foe.name}: Gold first. Speeches later.`,
-      `${foe.name}: Your shields are a suggestion.`,
-    ];
-    this.say(lines[Math.floor(Math.random() * lines.length)] ?? lines[0], "info");
+    const raw = text.trim().slice(0, 80);
+    if (!raw) return null;
+    let body = raw;
+    let to: string | null = null;
+    let who = "the quadrant";
+    if (body.startsWith("@")) {
+      const lock = this.shipById(this.player.lockId);
+      body = body.slice(1).trim();
+      if (!lock || !body) {
+        this.say("Hail needs a lock. Press @ only when someone is locked.", "info");
+        return null;
+      }
+      if (!this.visible(lock, this.player) && !this.visible(this.player, lock)) {
+        this.say(`${lock.name} is out of range for a hail.`, "info");
+        return null;
+      }
+      who = lock.name;
+      to = lock.remote ? lock.id.slice(4) : lock.id;
+    }
+    if (this.interference(this.player)) body = garble(body, "@");
+    this.say(to ? `To ${who}: ${body}` : `${this.player.name}: ${body}`, "hail");
+    this.onHail?.({ text: `${this.player.name}: ${body}`, to });
+    if (to && !to.startsWith("net") && !this.ships.find((s) => s.id === to)?.remote) {
+      const foe = this.shipById(to);
+      if (foe && !foe.isPlayer) {
+        const lines = [
+          `${foe.name}: Save it for the debris field.`,
+          `${foe.name}: Noted. I still intend to shoot you.`,
+          `${foe.name}: Gold first. Speeches later.`,
+        ];
+        const reply = lines[Math.floor(Math.random() * lines.length)] ?? lines[0];
+        this.say(this.interference(this.player) ? garble(reply, "#") : reply, "info");
+      }
+    } else if (!to) {
+      const foe = this.ships.find((s) => s.alive && !s.isPlayer && !s.docked && !s.remote);
+      if (foe) {
+        const reply = `${foe.name}: Noted.`;
+        this.say(this.interference(this.player) ? garble(reply, "#") : reply, "info");
+      }
+    }
+    return { text: `${this.player.name}: ${body}`, to };
+  }
+
+  hearHail(text: string) {
+    const body = this.interference(this.player) ? garble(text, "#") : text;
+    this.say(body.slice(0, 96), "hail");
   }
 
   private goldAboard(ship: Ship) {
@@ -976,6 +1119,9 @@ export class TrekSim {
       ship.drones = ship.cls.drones ?? 0;
       ship.mines = ship.cls.mines ?? 0;
       ship.crystals = ship.cls.crystals ?? 0;
+      ship.antimatter = 5000;
+      ship.amAcc = 0;
+      ship.crystalAcc = 0;
       ship.raiseLatch = false;
       this.say(
         gained > 0
@@ -1193,8 +1339,8 @@ export class TrekSim {
   }
 
   private easeWarp(ship: Ship, target: number, dt: number) {
-    const max = ship.twLeft > 0 ? ship.cls.maxWarp + 4 : ship.cls.maxWarp;
-    const goal = clamp(target, 0, max);
+    const max = ship.twLeft > 0 ? this.tearOf(ship) : this.tearOf(ship);
+    const goal = clamp(target, -2, max);
     if (ship.energy < 8) {
       ship.warp = Math.max(0, ship.warp - WARP_ACCEL * dt);
       return;
@@ -1407,8 +1553,7 @@ export class TrekSim {
     if (target.remote) {
       if (attacker && attacker.isPlayer) {
         attacker.dmgGiven += raw;
-        attacker.pendingDmg += raw;
-        if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * 0.5;
+        this.payForHit(attacker, target, raw);
       }
       target.hitFlash = 0.18;
       const peer = target.id.startsWith("net:") ? target.id.slice(4) : "";
@@ -1420,12 +1565,13 @@ export class TrekSim {
       return;
     }
     let left = raw;
-    if (target.shield > 0) {
+    const naked = Boolean(this.nebulaAt(target));
+    if (!naked && target.shield > 0) {
       const pct = Math.min(target.shield, left / target.cls.shieldStr);
       target.shield -= pct;
       left -= pct * target.cls.shieldStr;
     }
-    if (left > 0 && target.crystals > 0) {
+    if (left > 0 && target.crystals > 0 && !naked) {
       const soak = Math.min(target.crystals, left);
       target.crystals -= soak;
       left -= soak;
@@ -1436,8 +1582,7 @@ export class TrekSim {
     if (attacker && attacker !== target) {
       if (target.isPlayer) this.noteThreat(attacker.id);
       attacker.dmgGiven += raw;
-      attacker.pendingDmg += raw;
-      if (target.banked > 400 || target.dmgGiven > 1200) attacker.pendingBonus += raw * 0.5;
+      this.payForHit(attacker, target, raw);
       const prev = attacker.conflictAt.get(target.id) ?? 0;
       if (this.t - prev > 12) {
         attacker.conflicts += 1;
@@ -1532,6 +1677,7 @@ export class TrekSim {
           ship.drones = ship.cls.drones ?? 0;
           ship.mines = ship.cls.mines ?? 0;
           ship.crystals = ship.cls.crystals ?? 0;
+          ship.antimatter = 5000;
           ship.born = this.t;
           this.say(`${ship.name} relaunched from ${base.name}.`, "info");
         }
@@ -1579,6 +1725,7 @@ export class TrekSim {
       let drain = Math.abs(ship.warp) * 0.85;
       if (ship.cloaked) drain += 7;
       ship.energy = clamp(ship.energy + (3 - drain) * dt, 0, ship.cls.energy);
+      this.burnFuel(ship, dt);
       if (ship.energy < 8) ship.cloaked = false;
       if (!ship.docked) {
         for (const planet of PLANETS) {
@@ -1587,6 +1734,8 @@ export class TrekSim {
             ship.energy = Math.min(ship.cls.energy, ship.energy + 7 * dt);
           }
         }
+        this.refillAntimatter(ship, dt);
+        this.terrain(ship, dt);
       }
       if (ship.energy <= 0 && ship.twLeft <= 0) {
         ship.warp = Math.max(0, ship.warp - WARP_ACCEL * dt);
@@ -1602,6 +1751,7 @@ export class TrekSim {
           ship.drones = ship.cls.drones ?? 0;
           ship.mines = ship.cls.mines ?? 0;
           ship.crystals = ship.cls.crystals ?? 0;
+          ship.antimatter = 5000;
           const gained = this.goldAboard(ship);
           this.clearAboard(ship);
           ship.banked += gained;
@@ -1676,7 +1826,7 @@ export class TrekSim {
         if (Math.abs(angDiff(p.yaw, p.courseYaw)) < 0.04) p.courseYaw = null;
       }
       if (p.twLeft <= 0) {
-        if (warpUp && p.energy >= 8) p.warp = Math.min(p.cls.maxWarp, p.warp + WARP_ACCEL * dt);
+        if (warpUp && p.energy >= 8 && p.antimatter > 0) p.warp = Math.min(this.tearOf(p), p.warp + WARP_ACCEL * dt);
         if (warpDn) p.warp = Math.max(-2, p.warp - WARP_ACCEL * dt);
       }
       if (climb !== 0 && p.twLeft <= 0) p.z += climb * CLIMB * dt;
@@ -1889,12 +2039,154 @@ export class TrekSim {
     p.drones = p.cls.drones ?? 0;
     p.mines = p.cls.mines ?? 0;
     p.crystals = p.cls.crystals ?? 0;
+    p.antimatter = 5000;
+    p.amAcc = 0;
     p.born = this.t;
     p.phaserCd = 0;
     p.torpCd = 0.3;
     this.over = false;
     this.killedBy = "";
     this.say("Relaunched. The vault kept what you banked. The rest is gone.", "amber");
+  }
+
+  private burnFuel(ship: Ship, dt: number) {
+    if (!ship.alive) return;
+    const tear = this.tearOf(ship);
+    const cruise = ship.cls.maxWarp;
+    if (ship.warp > tear) ship.warp = tear;
+    if (!ship.docked) {
+      ship.amAcc += antimatterUsed(ship.warp, ship.shield > 10, ship.cloaked, dt);
+      while (ship.amAcc >= 1 && ship.antimatter > 0) {
+        ship.amAcc -= 1;
+        ship.antimatter -= 1;
+      }
+    }
+    const cap = Math.min(ship.cls.energy, Math.max(0, ship.antimatter));
+    if (ship.energy > cap) ship.energy = cap;
+    if (ship.antimatter <= 0 && ship.warp > 1 && ship.twLeft <= 0) {
+      ship.warp = Math.max(1, ship.warp - WARP_ACCEL * dt);
+    }
+    if (ship.warp > cruise && ship.twLeft <= 0 && !ship.docked) {
+      ship.crystalAcc += crystalBurn(ship.warp, cruise, dt);
+      while (ship.crystalAcc >= 1 && ship.crystals > 0) {
+        ship.crystalAcc -= 1;
+        ship.crystals -= 1;
+      }
+      ship.energy = Math.max(0, ship.energy - (ship.warp - cruise) * 6 * dt);
+      if (ship.crystals <= 0) ship.warp = Math.min(ship.warp, cruise);
+      const bite = hullTear(ship.warp, tear, dt);
+      if (bite > 0) {
+        ship.hull -= bite;
+        if (ship.isPlayer && this.t > this.warpNote) {
+          this.warpNote = this.t + 3;
+          this.say("Damage warp. The hull is coming apart.", "alert");
+        }
+        if (ship.hull <= 0) this.destroy(ship, null);
+      }
+    }
+  }
+
+  private refillAntimatter(ship: Ship, dt: number) {
+    for (const spot of SPOTS) {
+      if (spot.quad !== ship.quad) continue;
+      const codeA = spot.code.split(/\s+/).includes("A");
+      if (!codeA && spot.id !== ship.home) continue;
+      if (this.dist(ship.x, ship.y, spot.x, spot.y, ship.z, spot.z) < Math.max(150, spot.r)) {
+        ship.antimatter = Math.min(5000, ship.antimatter + 80 * dt);
+        return;
+      }
+    }
+  }
+
+  private terrain(ship: Ship, dt: number) {
+    if (!ship.alive || ship.docked) return;
+    for (const spot of SPOTS) {
+      if (spot.quad !== ship.quad) continue;
+      const kind = terrainOf(spot.name);
+      if (kind !== "asteroid" && kind !== "cygnus") continue;
+      const d = this.dist(ship.x, ship.y, spot.x, spot.y, ship.z, spot.z);
+      if (kind === "asteroid" && d < spot.r && Math.abs(ship.warp) > 8) {
+        const hit = 10 * dt;
+        if (ship.shield > 0) ship.shield = Math.max(0, ship.shield - hit);
+        else ship.hull -= hit;
+        if (ship.isPlayer && this.t > this.edgeNote) {
+          this.edgeNote = this.t + 3;
+          this.say("Asteroids. Warp 8 or less, or they eat the shields.", "alert");
+        }
+        if (ship.hull <= 0) {
+          this.destroy(ship, null);
+          return;
+        }
+      }
+      if (kind === "cygnus") {
+        const pullR = rawToWorld("cygnus", spot.r, 10000);
+        const core = rawToWorld("cygnus", spot.r, 500);
+        if (d < core && ship.holeCd <= 0) this.dumpFromCygnus(ship);
+        else if (d < pullR && d > 1) {
+          const pull = (1 - d / pullR) ** 2 * 520 * dt;
+          ship.x += ((spot.x - ship.x) / d) * pull;
+          ship.y += ((spot.y - ship.y) / d) * pull;
+          ship.z += ((spot.z - ship.z) / d) * pull;
+        }
+      }
+    }
+  }
+
+  private dumpFromCygnus(ship: Ship) {
+    const order: Quad[] = ["A", "B", "G", "O"];
+    const quad = order[Math.floor(Math.random() * order.length)] ?? "A";
+    const zone = zoneOf(quad);
+    ship.quad = quad;
+    ship.x = zone.minX + Math.random() * (zone.maxX - zone.minX);
+    ship.y = zone.minY + Math.random() * (zone.maxY - zone.minY);
+    ship.z = 4200 + Math.random() * 900;
+    ship.holeCd = 6;
+    ship.warp = Math.min(Math.abs(ship.warp), 4);
+    if (ship.isPlayer) this.say(`Cygnus has you. ${QUAD_NAME[quad]} quadrant, and not where you were.`, "amber");
+  }
+
+  /** Leaving mid-fight. Under 1,000 gold the ship is lost. Otherwise a third of the gold goes. */
+  breaksave() {
+    const p = this.player;
+    if (this.broke || p.docked || this.over) return;
+    if (this.t - this.lastCombat > 30) return;
+    this.broke = true;
+    const gold = p.banked + this.goldAboard(p);
+    const take = breaksaveTake(gold);
+    p.breaks += 1;
+    if (take.destroy) {
+      this.say("Breaksave under 1,000 gold. The ship is lost.", "alert");
+      this.destroy(p, null);
+      this.onBank?.(p);
+      return;
+    }
+    this.clearAboard(p);
+    p.banked = take.kept;
+    if (take.dropped > 0) this.picks.push({ x: p.x, y: p.y, z: p.z, gold: take.dropped, life: 90 });
+    this.say(`Breaksave ${p.breaks}. Vault cut to ${take.kept}. ${take.dropped} left in space.`, "alert");
+    this.onBank?.(p);
+  }
+
+  runMacro(macro: string) {
+    for (const ch of macro) {
+      const p = this.player;
+      if (ch === "w") this.nudgeWarp(1);
+      else if (ch === "s") this.nudgeWarp(-1);
+      else if (ch === "f" || ch === " ") this.firePhaser(p);
+      else if (ch === "t") this.fireTorp(p);
+      else if (ch === "g") this.fireDrone(p);
+      else if (ch === "m") this.dropMine(p);
+      else if (ch === "r") this.toggleRaise();
+      else if (ch === "c") this.toggleRepair();
+      else if (ch === "z") this.toggleCloak();
+      else if (ch === "i") this.toggleIntercept();
+      else if (ch === "x") this.transwarp();
+      else if (ch === ".") this.requestDock();
+      else if (ch === "u") this.requestUndock();
+      else if (ch === "b") this.goToBase();
+      else if (ch === "5") this.toggleAutoLock();
+      else if (ch === "7") this.toggleAiPilot();
+    }
   }
 
   snapshot(): Snapshot {
@@ -1949,6 +2241,9 @@ export class TrekSim {
     else if (bd < 110 && p.warp <= 1.4) hint = `${base.name} in range. Press . to dock and bank.`;
     else if (bd < 110) hint = "Kill warp under 1.4 to dock.";
     else if (p.hull / p.cls.hull < 0.28) hint = "Hull critical. Run for a starbase.";
+    else if (this.nebulaAt(p)) hint = "Nebula. Shields do nothing here, and the scan is short.";
+    else if (p.cloaked && this.cloakDead(p)) hint = "The cloak is drawing power and hiding nothing.";
+    else if (p.warp > p.cls.maxWarp) hint = "Overwarp. Crystals and fuel are burning.";
     else if (!p.raiseLatch && p.shield < 40) hint = "Shields low. Hold R or latch raise.";
     else if (nearPlanet) hint = `Orbiting ${nearPlanet}. Dilithium is feeding the core.`;
     return {
@@ -1956,10 +2251,13 @@ export class TrekSim {
       t: this.t,
       warp: p.warp,
       maxWarp: p.cls.maxWarp,
+      damageWarp: this.tearOf(p),
       heading: headingOf(p.yaw),
       z: p.z,
       energy: p.energy,
-      energyMax: p.cls.energy,
+      energyMax: Math.min(p.cls.energy, Math.max(0, p.antimatter)),
+      antimatter: p.antimatter,
+      breaks: p.breaks,
       shield: p.shield,
       hull: Math.max(0, p.hull),
       hullMax: p.cls.hull,

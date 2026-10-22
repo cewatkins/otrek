@@ -7,7 +7,7 @@ export type BoardMsg = {
   playing?: boolean;
   bye?: boolean;
   t?: number;
-  hail?: { text?: string; n?: number } | null;
+  hail?: { text?: string; n?: number; to?: string | null } | null;
   hit?: { to?: string; dmg?: number; n?: number; by?: string } | null;
   kind?: string;
   to?: string;

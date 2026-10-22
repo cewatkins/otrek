@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { CLASSES, SHEETS } from "@/game/classes";
 import { QUADRANT_ROBOTS } from "@/game/sim";
-import { loadCallsign, loadScores, saveCallsign, type ScoreRow } from "@/game/scores";
+import { loadCallsign, saveCallsign } from "@/game/scores";
+import { listBoard, type BoardRow } from "@/lib/board";
+import { GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { SignInGate, UserButton } from "@/lib/auth/gates";
 import { useBoard } from "@/lib/multiplayer/use-board";
 
 type Props = {
@@ -14,7 +17,6 @@ type Mode = "solo" | "quadrant" | "humans";
 export function Shipyard({ onStart }: Props) {
   const [classId, setClassId] = useState(CLASSES[0].id);
   const [name, setName] = useState("USS Intrepid");
-  const [scores, setScores] = useState<ScoreRow[]>([]);
   const [real, setReal] = useState(true);
   const [mode, setMode] = useState<Mode>("quadrant");
   const [lobbyId] = useState(() => `w-${Math.random().toString(36).slice(2, 10)}`);
@@ -26,7 +28,6 @@ export function Shipyard({ onStart }: Props) {
     const saved = loadCallsign();
     setName(saved.name);
     if (CLASSES.some((c) => c.id === saved.classId)) setClassId(saved.classId);
-    setScores(loadScores());
     const q = new URLSearchParams(window.location.search);
     if (q.get("play") === "humans") setMode("humans");
     else if (q.get("play") === "quadrant" || q.get("room")) setMode("quadrant");
@@ -76,6 +77,7 @@ export function Shipyard({ onStart }: Props) {
             {live.notice ? <p className="mt-1 font-mono text-xs text-amber">{live.notice}</p> : null}
             <p className="mt-1 font-mono text-[10px] text-muted">{linked ? live.status : ""}</p>
           </div>
+          <UserButton />
           <button
             type="button"
             role="switch"
@@ -310,22 +312,28 @@ export function Shipyard({ onStart }: Props) {
               </p>
             </section>
             <section>
-              <h3 className="font-mono text-xs tracking-widest text-muted">VAULT</h3>
-              {scores.length === 0 ? (
-                <p className="mt-2 text-sm text-muted">No ship has banked gold in this browser yet.</p>
-              ) : (
-                <ol className="mt-2 space-y-1 font-mono text-xs">
-                  {scores.map((row) => (
-                    <li key={`${row.name}-${row.code}`} className="flex justify-between gap-3">
-                      <span className="truncate">
-                        {row.name}{" "}
-                        <span className="text-muted">{row.code}</span>
-                      </span>
-                      <span className="text-gold">{row.gold.toLocaleString("en-US")}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
+              <h3 className="font-mono text-xs tracking-widest text-muted">FLEET BOARD</h3>
+              <div className="mt-2 min-h-16">
+                <SignInGate
+                  fallback={
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted">Sign in to post your vault and read the fleet.</p>
+                      {GROK_PROVIDERS.map((p) => (
+                        <button
+                          key={p.providerId}
+                          type="button"
+                          onClick={() => signIn(p.providerId, { callbackURL: "/" })}
+                          className="block w-full border border-line px-3 py-2 text-left font-mono text-xs hover:border-amber"
+                        >
+                          Continue with {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  }
+                >
+                  <FleetBoard />
+                </SignInGate>
+              </div>
             </section>
           </div>
         </div>
@@ -396,5 +404,43 @@ function Cell({ k, v, wide = false }: { k: string; v: string; wide?: boolean }) 
       <dt className="font-mono text-[10px] tracking-widest text-muted">{k}</dt>
       <dd className="mt-0.5 font-mono text-sm text-fg">{v}</dd>
     </div>
+  );
+}
+
+function FleetBoard() {
+  const [rows, setRows] = useState<BoardRow[]>([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancel = false;
+    listBoard()
+      .then((next) => {
+        if (!cancel) setRows(next);
+      })
+      .catch(() => {
+        if (!cancel) setRows([]);
+      })
+      .finally(() => {
+        if (!cancel) setReady(true);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
+  if (!ready) return <p className="font-mono text-xs text-muted">Reading the board…</p>;
+  if (rows.length === 0) return <p className="text-sm text-muted">No gold posted yet. Dock to bank, and the vault lands here.</p>;
+  return (
+    <ol className="space-y-1 font-mono text-xs">
+      {rows.map((row, i) => (
+        <li key={`${row.callsign}-${row.code}-${i}`} className="flex justify-between gap-3">
+          <span className={`truncate ${row.yours ? "text-amber" : ""}`}>
+            {i + 1}. {row.callsign} <span className="text-muted">{row.code}</span>
+          </span>
+          <span className="text-gold">
+            {row.gold.toLocaleString("en-US")}
+            {row.breaks > 0 ? <span className="text-muted"> BRK {row.breaks}</span> : null}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }

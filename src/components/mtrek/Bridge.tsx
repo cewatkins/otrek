@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { unlockAudio } from "@/game/audio";
 import { cameraFor, drawTactical, pointerCommand } from "@/game/draw";
-import { saveScore } from "@/game/scores";
+import { loadKeymaps, saveKeymaps, saveScore } from "@/game/scores";
+import { submitScore } from "@/lib/board";
 import { CLASSES, classById, type ShipClass } from "@/game/classes";
 import { TrekSim, type Snapshot } from "@/game/sim";
 import { NetLink } from "@/components/mtrek/NetLink";
@@ -50,14 +51,27 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
   useEffect(() => {
     const sim = new TrekSim(name, classId, { bots });
     simRef.current = sim;
+    sim.keymaps = loadKeymaps();
     sim.onBank = (ship) => {
-      saveScore({
-        name: ship.name,
+      const row = {
+        callsign: ship.name,
         code: ship.cls.code,
         gold: Math.floor(ship.banked),
         dmg: Math.floor(ship.dmgGiven),
         kills: ship.kills,
+        breaks: ship.breaks,
+      };
+      saveScore({
+        name: row.callsign,
+        code: row.code,
+        gold: row.gold,
+        dmg: row.dmg,
+        kills: row.kills,
+        breaks: row.breaks,
         at: Date.now(),
+      });
+      void submitScore({ data: row }).catch(() => {
+        sim.say("Fleet board missed this vault. Sign in at the yard and dock again.", "info");
       });
     };
     setSnap(sim.snapshot());
@@ -116,6 +130,45 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
     const down = (e: KeyboardEvent) => {
       const target = e.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      const simNow = simRef.current;
+      if (!simNow) return;
+      if (simNow.mapPhase === "pick" && !e.repeat) {
+        e.preventDefault();
+        simNow.pendingMap = e.code;
+        simNow.mapPhase = "idle";
+        simNow.say(`Mapping ${e.code}. Type the macro in the hail line and Send.`, "amber");
+        setSnap(simNow.snapshot());
+        return;
+      }
+      if (simNow.mapPhase === "clear" && !e.repeat) {
+        e.preventDefault();
+        delete simNow.keymaps[e.code];
+        saveKeymaps(simNow.keymaps);
+        simNow.mapPhase = "idle";
+        simNow.say(`Cleared ${e.code}.`, "info");
+        setSnap(simNow.snapshot());
+        return;
+      }
+      if (e.code === "BracketLeft" && !e.repeat) {
+        e.preventDefault();
+        simNow.mapPhase = "pick";
+        simNow.say("Keymap. Press the key to bind. Letters: w s f t g m r c z i x . u b", "amber");
+        setSnap(simNow.snapshot());
+        return;
+      }
+      if (e.code === "BracketRight" && !e.repeat) {
+        e.preventDefault();
+        simNow.mapPhase = "clear";
+        simNow.say("Press the key to clear.", "info");
+        setSnap(simNow.snapshot());
+        return;
+      }
+      const macro = simNow.keymaps[e.code];
+      if (macro) {
+        e.preventDefault();
+        if (!e.repeat) simNow.runMacro(macro);
+        return;
+      }
       sim.keys.add(e.code);
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
         e.preventDefault();
@@ -160,9 +213,11 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       sim.touchDrone = false;
       sim.touchMine = false;
     };
+    const hide = () => sim.breaksave();
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
+    window.addEventListener("pagehide", hide);
 
     return () => {
       cancelAnimationFrame(raf);
@@ -170,6 +225,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
+      window.removeEventListener("pagehide", hide);
       delete window.__controlsTest;
     };
   }, [name, classId, bots]);
@@ -216,11 +272,23 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
   const sendHail = () => {
     const sim = simRef.current;
     if (!sim) return;
-    sim.hail(hail);
-    if (hail.trim()) {
+    if (sim.pendingMap) {
+      const macro = hail.trim().slice(0, 48);
+      if (macro) sim.keymaps[sim.pendingMap] = macro;
+      else delete sim.keymaps[sim.pendingMap];
+      saveKeymaps(sim.keymaps);
+      sim.say(macro ? `Mapped ${sim.pendingMap}.` : `Cleared ${sim.pendingMap}.`, "info");
+      sim.pendingMap = "";
+      setHail("");
+      setSnap(sim.snapshot());
+      return;
+    }
+    const sent = sim.hail(hail);
+    if (sent) {
       netSend.current?.({
         k: "hail",
-        text: `${name}: ${hail.trim().slice(0, 80)}`,
+        text: sent.text,
+        to: sent.to,
         n: Date.now(),
       });
     }
@@ -336,7 +404,10 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
                   <button
                     type="button"
                     className="h-11 flex-1 border border-line"
-                    onClick={onLeave}
+                    onClick={() => {
+                      simRef.current?.breaksave();
+                      onLeave();
+                    }}
                   >
                     Shipyard
                   </button>
@@ -381,7 +452,7 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
         <input
           value={hail}
           onChange={(e) => setHail(e.target.value)}
-          placeholder={room ? "Hail the quadrant" : "Hail. Solo — no other players hear this."}
+          placeholder={simRef.current?.pendingMap ? "Macro, then Send. w s f t g m r c z i x . u b" : "Hail. @text talks to your lock."}
           aria-label="Hail"
           className="min-w-0 flex-1 border border-line bg-surface px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-amber"
         />
@@ -440,7 +511,8 @@ export function Bridge({ name, classId, room, bots = true, onLeave }: Props) {
             </div>
             {helpPage === "commands" ? (
             <ul className="mt-4 space-y-2 font-mono text-xs leading-relaxed text-fg">
-              <li><span className="text-amber">Flight.</span> W raises warp, one step per tap and more if you hold it. S lowers warp and then reverses. Shift+W also slows. Up and Down change Z. A or Left turns left. D or Right turns right. Click empty space to come about. Click the long-range chart to plot a course, including the Z of a body you click. These keys still work if intercept is on.</li>
+              <li><span className="text-amber">Flight.</span> W raises warp, one step per tap and more if you hold it. Past the cruising maximum it is overwarp: crystals burn and fuel drops. The last number is damage warp and the hull tears. S lowers warp and then reverses. Up and Down change Z. A or Left turns left. D or Right turns right. Click empty space to come about. Click the long-range chart to plot a course, including the Z of a body you click.</li>
+              <li><span className="text-amber">Space.</span> A nebula ignores shields and shortens the scan. Asteroids take 10 shield points a second above warp 8. A quasar, and a pulsar while it is awake, make a cloak useless. Cygnus pulls, and the core throws you somewhere else. [ binds a keymap. ] clears one. @ at the start of a hail talks only to your lock.</li>
               <li><span className="text-amber">Lock.</span> Autolock is on when you launch. It holds the ship shooting at you, otherwise the closest one you can see. Press 5 to turn autolock off and pick a lock yourself. Click a ship on the radar or the forward view. Humans are a, b, c. Blue beams are yours. Red beams are theirs.</li>
               <li><span className="text-amber">Base run.</span> 2 steers to the closest starbase, slows, docks, and the yard repairs the hull and refills everything. Press 2 again, or touch the helm, to cancel.</li>
               <li><span className="text-amber">AI helm.</span> 7 hands your ship to the same captain the robots use. It hunts, shoots, flees, and docks. Press 7 again to take the helm back.</li>
@@ -519,9 +591,11 @@ function Status({ snap }: { snap: Snapshot }) {
   return (
     <div className="space-y-4 font-mono text-xs">
       <Stat k="WARP" v={`${snap.warp.toFixed(1)} / ${snap.maxWarp}`} />
+      <Stat k="DAMAGE W" v={String(snap.damageWarp)} />
       <Stat k="HEADING" v={pad3(snap.heading)} />
       <Stat k="Z" v={String(Math.round(snap.z))} />
-      <Bar k="ENERGY" pct={snap.energy / snap.energyMax} />
+      <Bar k="ENERGY" pct={snap.energyMax > 0 ? snap.energy / snap.energyMax : 0} />
+      <Stat k="ANTIMATTER" v={String(Math.round(snap.antimatter))} />
       <Bar k="SHIELDS" pct={snap.shield / 100} hot={snap.shield < 30} />
       <Bar k="HULL" pct={hullPct} hot={hullPct < 0.3} />
       <Stat k={snap.torpName.toUpperCase()} v={`${snap.torps} / ${snap.torpMax}`} />
